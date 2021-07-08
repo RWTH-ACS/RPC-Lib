@@ -1,0 +1,3 @@
+[submodule "submodules/libtirpc"]
+	path = submodules/libtirpc
+	url = git://git.linux-nfs.org/projects/steved/libtirpc.git

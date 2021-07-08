@@ -1,0 +1,30 @@
+file = _{ SOI ~ (typedef_rule | struct_rule | union_rule)* ~ program_rule ~ EOI}
+
+program_rule = {"program " ~ identifier ~ "{" ~ version_rule ~ "}" ~ "=" ~ integer ~ ";"}
+version_rule = {"version " ~ identifier ~ "{" ~ function_rule* ~ "}" ~ "=" ~ integer ~ ";"}
+
+function_rule = { type_ident ~ func_ident ~ "(" ~ parameter_list  ~ ")" ~ "=" ~ integer ~ ";" }
+parameter_list = { parameter* ~ ("," ~ parameter)* }
+parameter = _{ (built_in_type | identifier) ~ identifier? }
+func_ident = @{ identifier }
+
+struct_rule = { "struct" ~ identifier ~ "{" ~ (type_name_pair ~ ";")* ~ "}" ~ ";" }
+typedef_rule = { "typedef" ~ type_ident ~ (array | identifier) ~ ";" }
+union_rule = { "union" ~ type_ident ~ "switch" ~ "(" ~ type_name_pair ~ ")" ~ "{" ~ "case" ~ integer ~ ":" ~ type_name_pair ~ ";" ~ "default:" ~ identifier ~ ";" ~ "}" ~ ";" }
+
+type_name_pair = { type_ident ~ (array | identifier) }
+array = _{ array_fixed | array_varlen }
+array_fixed = { identifier ~ "[" ~ integer ~ "]" }
+array_varlen = { identifier ~ "<" ~ integer? ~ ">" }
+
+type_ident = ${ pre_declared_struct | built_in_type ~ &WHITESPACE+ | identifier}
+pre_declared_struct = _{ "struct" ~ WHITESPACE+ ~ identifier }
+built_in_type = @{ rpcl_string | (signed ~ WHITESPACE+)? ~ ("char" | "short" | "int" | "long") }
+
+integer = @{ ASCII_DIGIT+ }
+identifier = @{("_" | ASCII_ALPHA) ~ ("_" | ASCII_ALPHANUMERIC)*}
+signed = _{ "signed" | "unsigned" }
+rpcl_string = @{ "string<>" | "string" }
+
+WHITESPACE = _{ " " | "\t" | "\n" }
+COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
