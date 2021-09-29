@@ -1,3 +1,5 @@
-mod common;
+mod rpc_clnt;
+mod xdr;
 
-pub use common::generate_ctor_dtor;
+pub use self::rpc_clnt::clnt_create;
+pub use self::rpc_clnt::RpcClient;

@@ -15,7 +15,7 @@ use super::util::*;
 #[grammar = "rpcl.pest"]
 pub struct XFileParser;
 
-pub fn parse(x_file: &String, struct_name: &String) -> (QuoteTokenStream, i32, i32) {
+pub fn parse(x_file: &String, struct_name: &String) -> (QuoteTokenStream, u32, u32) {
     let parsed = XFileParser::parse(Rule::file, x_file).expect("Syntax Error in .x-File");
 
     let mut struct_definitions: Vec<StructDef> = Vec::new();
@@ -23,8 +23,8 @@ pub fn parse(x_file: &String, struct_name: &String) -> (QuoteTokenStream, i32, i
     let mut type_definitions: Vec<TypeDef> = Vec::new();
     let mut function_definitions: Vec<FunctionDef> = Vec::new();
 
-    let mut program_number = -1;
-    let mut version_number = -1;
+    let mut program_number = 0;
+    let mut version_number = 0;
 
     for x in parsed {
         match x.as_rule() {
@@ -93,45 +93,45 @@ pub fn parse(x_file: &String, struct_name: &String) -> (QuoteTokenStream, i32, i
         }
     }
 
-    // C-Bindings & Functions
-    let mut c_bindings_block = quote!();
-    let mut function_block = quote!();
-    for def in function_definitions {
-        let (function_code, binding) = def.to_rust_code(version_number);
-        function_block = quote! {
-            #function_block
-            #function_code
-        };
-        c_bindings_block = quote! {
-            #c_bindings_block
-            #binding
-        }
-    }
+    // // C-Bindings & Functions
+    // let mut c_bindings_block = quote!();
+    // let mut function_block = quote!();
+    // for def in function_definitions {
+    //     let (function_code, binding) = def.to_rust_code(version_number);
+    //     function_block = quote! {
+    //         #function_block
+    //         #function_code
+    //     };
+    //     c_bindings_block = quote! {
+    //         #c_bindings_block
+    //         #binding
+    //     }
+    // }
 
-    // pasting everything together
-    let name = format_ident!("{}", struct_name);
-    code = quote! {
-        #code
+    // // pasting everything together
+    // let name = format_ident!("{}", struct_name);
+    // code = quote! {
+    //     #code
 
-        extern "C" {
-            #c_bindings_block
-        }
+    //     extern "C" {
+    //         #c_bindings_block
+    //     }
 
-        impl #name {
-            #function_block
-        }
-    };
+    //     impl #name {
+    //         #function_block
+    //     }
+    // };
 
     (code, program_number, version_number)
 }
 
-fn program_rule(x: pest::iterators::Pair<'_, Rule>) -> (Vec<FunctionDef>, i32, i32) {
+fn program_rule(x: pest::iterators::Pair<'_, Rule>) -> (Vec<FunctionDef>, u32, u32) {
     // program_rule -> version_rule
     let mut program_iter = x.into_inner();
     let _program_name = program_iter.next().unwrap();
     let version_pair = program_iter.next().unwrap();
 
-    let mut version_number = -1;
+    let mut version_number = 0;
     let mut function_definitions: Vec<FunctionDef> = Vec::new();
     for item in version_pair.into_inner() {
         match item.as_rule() {
@@ -139,7 +139,7 @@ fn program_rule(x: pest::iterators::Pair<'_, Rule>) -> (Vec<FunctionDef>, i32, i
                 let _version_name = item.as_str();
             }
             Rule::integer => {
-                version_number = item.as_str().parse::<i32>().unwrap();
+                version_number = item.as_str().parse::<u32>().unwrap();
             }
             Rule::function_rule => {
                 let def = FunctionDef::from_pest(item);
@@ -154,7 +154,7 @@ fn program_rule(x: pest::iterators::Pair<'_, Rule>) -> (Vec<FunctionDef>, i32, i
         .next()
         .unwrap()
         .as_str()
-        .parse::<i32>()
+        .parse::<u32>()
         .unwrap();
 
     (function_definitions, program_number, version_number)

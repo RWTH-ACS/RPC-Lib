@@ -1,17 +1,7 @@
 [package]
 name = "rpc-lib"
-version = "0.1.0"
-edition = "2018"
-
-[lib]
-proc-macro = true
+version = "1.0.0"
 
 [dependencies]
-cc = "1.0"
+rpc-lib-impl = { version = "1.0.0", path = "rpc-lib-impl" }
 quote = "1.0"
-proc-macro2 = "1.0"
-pest = "2.0"
-pest_derive = "2.0"
-
-[build-dependencies]
-cc = "1.0"
