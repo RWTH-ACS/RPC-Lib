@@ -4,8 +4,6 @@ use quote::{format_ident, quote};
 use super::parser::Rule;
 use super::util::*;
 
-use std::collections::HashSet;
-
 struct Field {
     field_type: String,
     field_name: String,
@@ -84,10 +82,12 @@ impl StructDef {
     }
 
     /// Generates Rust-Code
-    pub fn to_rust_code(&self, varlen_arrays: &mut HashSet<String>) -> QuoteTokenStream {
+    pub fn to_rust_code(&self) -> QuoteTokenStream {
         let name = format_ident!("{}", self.identifier);
 
         let mut fields: QuoteTokenStream = quote!();
+        let mut serialize_code: QuoteTokenStream = quote!();
+        let mut deserialize_code: QuoteTokenStream = quote!();
 
         for field in &self.contained_items {
             // If type is not primitve then it is typedef or struct  (which are being defined somewhere above)
@@ -113,14 +113,23 @@ impl StructDef {
                     quote!([#orig_type; #arr_size])
                 }
                 TypeKind::VarlenArray => {
-                    varlen_arrays.insert(field.field_type.clone());
                     let orig_type = format_ident!(
-                        "{}_var_arr",
+                        "Vec<{}>",
                         convert_primitve_type(&field.field_type)
                             .unwrap_or_else(|| &field.field_type)
                     );
                     quote!(#orig_type)
                 }
+            };
+
+            serialize_code = quote! {
+                #serialize_code
+                vec.extend(self.#field_name.serialize());
+            };
+
+            deserialize_code = quote! {
+                #deserialize_code
+                #field_name: <#type_code> ::deserialize(bytes, parse_index),
             };
 
             fields = quote! {
@@ -130,9 +139,22 @@ impl StructDef {
         }
 
         let code = quote! {
-            #[repr(C)]
             struct #name {
                 #fields
+            }
+
+            impl Xdr for #name {
+                fn serialize(&self) -> Vec<u8> {
+                    let mut vec = Vec::new();
+                    #serialize_code
+                    vec
+                }
+            
+                fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> #name {
+                    #name {
+                        #deserialize_code
+                    }
+                }
             }
         };
         code

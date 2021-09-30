@@ -4,8 +4,6 @@ use quote::{format_ident, quote};
 use super::parser::Rule;
 use super::util::*;
 
-use std::collections::HashSet;
-
 pub struct UnionDef {
     pub identifier: String,
     pub optional_data_type: String,
@@ -58,9 +56,8 @@ impl UnionDef {
     }
 
     /// Generates Rust-Code
-    pub fn to_rust_code(&self, varlen_arrays: &mut HashSet<String>) -> QuoteTokenStream {
+    pub fn to_rust_code(&self) -> QuoteTokenStream {
         let union_name = format_ident!("{}", self.identifier);
-        let inner_union_ident = format_ident!("{}_u", self.identifier);
 
         // Type: Converting from C to Rust
         let inner_union_type = match self.kind {
@@ -83,11 +80,10 @@ impl UnionDef {
             }
             TypeKind::VarlenArray => {
                 if self.optional_data_type == "string" {
-                    quote!(*mut c_char)
+                    quote!(String)
                 } else {
-                    varlen_arrays.insert(self.optional_data_type.clone());
                     let orig_type = format_ident!(
-                        "{}_var_arr",
+                        "Vec<{}>",
                         convert_primitve_type(&self.optional_data_type)
                             .unwrap_or_else(|| &self.optional_data_type)
                     );
@@ -97,10 +93,46 @@ impl UnionDef {
         };
         let code = quote! {
             // Contained type may be defined somewhere above (If Array-Type)
-            #[repr(C)]
             struct #union_name {
-                err: i32,
-                #inner_union_ident: #inner_union_type
+                data: Result<#inner_union_type, i32>,
+            }
+
+            impl Xdr for #union_name {
+                fn serialize(&self) -> Vec<u8> {
+                    // TODO Stub
+                    Vec::new()
+                }
+
+                fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> #union_name {
+                    // Parse int
+                    let err_code = i32::deserialize(bytes, parse_index);
+                    if err_code == 0 {
+                        let optional_data = <#inner_union_type> ::deserialize(bytes, parse_index);
+                        #union_name {
+                            data: Ok(optional_data),
+                        }
+                    }
+                    else {
+                        #union_name {
+                            data: Err(err_code),
+                        }
+                    }
+                }
+            }
+
+            // QOL Auto Deref (<union-type>.data.unwrap() -> <union-type>.unwrap())
+            impl std::ops::Deref for #union_name {
+                type Target = Result<#inner_union_type, i32>;
+            
+                fn deref(&self) -> &Self::Target {
+                    &self.data
+                }
+            }
+            
+            impl std::ops::DerefMut for #union_name {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.data
+                }
             }
         };
         code

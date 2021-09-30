@@ -1,5 +1,4 @@
 mod rpc_clnt;
-mod xdr;
+pub mod xdr;
 
-pub use self::rpc_clnt::clnt_create;
-pub use self::rpc_clnt::RpcClient;
+pub use self::rpc_clnt::{clnt_create, rpc_call, RpcClient, RpcReply};

@@ -28,9 +28,9 @@ impl Xdr for Rpcb {
         Rpcb {
             program: u32::deserialize(bytes, parse_index),
             version: u32::deserialize(bytes, parse_index),
-            netid:   String::deserialize(bytes, parse_index),
+            netid: String::deserialize(bytes, parse_index),
             address: String::deserialize(bytes, parse_index),
-            owner:   String::deserialize(bytes, parse_index),
+            owner: String::deserialize(bytes, parse_index),
         }
     }
 }
@@ -38,7 +38,7 @@ impl Xdr for Rpcb {
 #[derive(Debug)]
 struct FragmentHeader {
     last_fragment: bool,
-    length:        u32,
+    length: u32,
 }
 
 impl Xdr for FragmentHeader {
@@ -46,8 +46,7 @@ impl Xdr for FragmentHeader {
         let mut vec = Vec::new();
         if self.last_fragment {
             vec.extend((self.length + (1 << 31)).serialize());
-        }
-        else {
+        } else {
             vec.extend(self.length.serialize());
         }
         vec
@@ -59,7 +58,7 @@ impl Xdr for FragmentHeader {
         let num = u32::from_be_bytes(*x);
         FragmentHeader {
             last_fragment: (1 << 31) & num != 0,
-            length:        num - (1 << 31),
+            length: num - (1 << 31),
         }
     }
 }
@@ -67,14 +66,14 @@ impl Xdr for FragmentHeader {
 #[derive(Debug)]
 struct RpcCall {
     fragment_header: FragmentHeader,
-    xid:             u32,
-    msg_type:        u32, // (Call: 0, Replay: 1)
+    xid: u32,
+    msg_type: u32, // (Call: 0, Replay: 1)
 }
 
 impl Xdr for RpcCall {
     fn serialize(&self) -> Vec<u8> {
         let mut vec = Vec::new();
-        vec.extend(self.fragment_header.serialize());   // TODO
+        vec.extend(self.fragment_header.serialize());
         vec.extend(self.xid.serialize());
         vec.extend(self.msg_type.serialize());
         vec
@@ -83,25 +82,25 @@ impl Xdr for RpcCall {
     fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> RpcCall {
         RpcCall {
             fragment_header: FragmentHeader::deserialize(bytes, parse_index),
-            xid:             u32::deserialize(bytes, parse_index),
-            msg_type:        u32::deserialize(bytes, parse_index),
+            xid: u32::deserialize(bytes, parse_index),
+            msg_type: u32::deserialize(bytes, parse_index),
         }
     }
 }
 
 struct RpcRequest {
-    header:      RpcCall,
+    header: RpcCall,
     rpc_version: u32,
     program_num: u32,
     version_num: u32,
-    proc_num:    u32,
+    proc_num: u32,
     credentials: u64,
-    verifier:    u64,
+    verifier: u64,
 }
 
 impl Xdr for RpcRequest {
-    fn serialize(&self) -> std::vec::Vec<u8> {
-        let mut vec = std::vec::Vec::new();
+    fn serialize(&self) -> Vec<u8> {
+        let mut vec = Vec::new();
         vec.extend(self.header.serialize());
         vec.extend(self.rpc_version.serialize());
         vec.extend(self.program_num.serialize());
@@ -114,29 +113,29 @@ impl Xdr for RpcRequest {
 
     fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> RpcRequest {
         RpcRequest {
-            header:      RpcCall::deserialize(bytes, parse_index),
+            header: RpcCall::deserialize(bytes, parse_index),
             rpc_version: u32::deserialize(bytes, parse_index),
             program_num: u32::deserialize(bytes, parse_index),
             version_num: u32::deserialize(bytes, parse_index),
-            proc_num:    u32::deserialize(bytes, parse_index),
+            proc_num: u32::deserialize(bytes, parse_index),
             credentials: u64::deserialize(bytes, parse_index),
-            verifier:    u64::deserialize(bytes, parse_index),
+            verifier: u64::deserialize(bytes, parse_index),
         }
     }
 }
 
 #[derive(Debug)]
-struct RpcReply {
-    header:       RpcCall,
-    reply_state:  u32,
-    verifier:     u64,
+pub struct RpcReply {
+    header: RpcCall,
+    reply_state: u32,
+    verifier: u64,
     accept_state: u32,
     // Serialized Data (Return Value of RPC-Procedure)
 }
 
 impl Xdr for RpcReply {
-    fn serialize(&self) -> std::vec::Vec<u8> {
-        let mut vec = std::vec::Vec::new();
+    fn serialize(&self) -> Vec<u8> {
+        let mut vec = Vec::new();
         vec.extend(self.header.serialize());
         vec.extend(self.reply_state.serialize());
         vec.extend(self.verifier.serialize());
@@ -146,9 +145,9 @@ impl Xdr for RpcReply {
 
     fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> RpcReply {
         RpcReply {
-            header:       RpcCall::deserialize(bytes, parse_index),
-            reply_state:  u32::deserialize(bytes, parse_index),
-            verifier:     u64::deserialize(bytes, parse_index),
+            header: RpcCall::deserialize(bytes, parse_index),
+            reply_state: u32::deserialize(bytes, parse_index),
+            verifier: u64::deserialize(bytes, parse_index),
             accept_state: u32::deserialize(bytes, parse_index),
         }
     }
@@ -162,15 +161,19 @@ struct UniversalAddress {
 
 #[derive(Debug)]
 pub struct RpcClient {
-    program:   u32,
-    version:   u32,
+    program: u32,
+    version: u32,
     univ_addr: UniversalAddress,
 }
 
 impl UniversalAddress {
+    // Format: xxx.xxx.xxx.xxx.xxx.xxx
     fn from_string(s: &String) -> UniversalAddress {
         let splitted = s.split('.').collect::<Vec<&str>>();
-        let mut ret = UniversalAddress{ ip: [0, 0, 0, 0], port: 0};
+        let mut ret = UniversalAddress {
+            ip: [0, 0, 0, 0],
+            port: 0,
+        };
         for i in 0..4 {
             ret.ip[i] = splitted[i].parse::<u8>().unwrap();
         }
@@ -179,29 +182,26 @@ impl UniversalAddress {
         ret
     }
 
+    // Format: xxx.xxx.xxx.xxx:xxxxx
     fn to_string(&self) -> String {
-        String::new()
+        let string_repr = std::format!(
+            "{}.{}.{}.{}:{}",
+            self.ip[0].to_string(),
+            self.ip[1].to_string(),
+            self.ip[2].to_string(),
+            self.ip[3].to_string(),
+            self.port.to_string(),
+        );
+        string_repr
     }
 }
 
 // Create Client
 pub fn clnt_create(address: &str, program: u32, version: u32) -> RpcClient {
-
-    let request = RpcRequest {
-        header: RpcCall {
-            fragment_header: FragmentHeader {
-                last_fragment: true,    // Only one Fragment
-                length:        96,
-            },
-            xid:               123456,  // Random but unique number
-            msg_type:          0,       // Type: Call
-        },
-        rpc_version:           2,
-        program_num:           100000,  // Portmap
-        version_num:           4,
-        proc_num:              3,       // GETADDR
-        credentials:           0,       // No authentification
-        verifier:              0,
+    let client = RpcClient {
+        program: 100000,
+        version: 4,
+        univ_addr: UniversalAddress::from_string(&(String::from(address) + ".0.111")), // Port of Portmap Service in universal address format
     };
 
     let rpcb = Rpcb {
@@ -212,19 +212,8 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> RpcClient {
         owner: String::from("rpclib"),
     };
 
-    let mut stream = TcpStream::connect(&(address.to_owned() + ":111")).expect("Failed to connect");
-
-    // Send Request to Portmapper
-    let bytes1 = request.serialize();
-    let bytes2 = rpcb.serialize();
-    stream.write(&bytes1).expect("Failed to query Port");
-    stream.write(&bytes2).expect("Failed to query Port");
-
-    // Receive Reply from Portmapper
-    let mut buf: [u8; 256] = [0; 256];
-    let rec = stream.read(&mut buf).expect("Failed to query Port");
-    let mut vec = Vec::new();
-    vec.extend_from_slice(&buf[0..rec]);
+    // Proc 3: GETADDR
+    let vec = rpc_call(&client, 3, &rpcb.serialize());
 
     // Parse Result
     let mut parse_index = 0;
@@ -235,8 +224,51 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> RpcClient {
     let addr = UniversalAddress::from_string(&universal_address_s);
 
     RpcClient {
-        program:   program,
-        version:   version,
+        program: program,
+        version: version,
         univ_addr: addr,
     }
+}
+
+// Rpc-Call
+pub fn rpc_call(client: &RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u8> {
+    let rpc_req_len = 40;
+    let length = u32::try_from(rpc_req_len + send.len()).unwrap();
+
+    let request = RpcRequest {
+        header: RpcCall {
+            fragment_header: FragmentHeader {
+                last_fragment: true, // Only one Fragment
+                length: length,
+            },
+            xid: 123456, // Random but unique number
+            msg_type: 0, // Type: Call
+        },
+        rpc_version: 2,
+        program_num: client.program,
+        version_num: client.version,
+        proc_num: procedure,
+        credentials: 0, // No authentification
+        verifier: 0,
+    };
+
+    // Connect
+    let addr = client.univ_addr.to_string();
+    let mut stream = TcpStream::connect(addr).expect("rpc_call: Failed to connect");
+
+    // Send Request
+    let request_header = request.serialize();
+    stream
+        .write(&request_header)
+        .expect("rpc_call: Failed to send data");
+    stream.write(&*send).expect("rpc_call: Failed to send data");
+
+    // Receive Reply
+    let mut buf: [u8; 2048] = [0; 2048];
+    let rec = stream
+        .read(&mut buf)
+        .expect("rpc_call: Failed to receive data");
+    let mut vec = Vec::new();
+    vec.extend_from_slice(&buf[0..rec]);
+    vec
 }

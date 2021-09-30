@@ -4,8 +4,6 @@ use quote::{format_ident, quote};
 use super::parser::Rule;
 use super::util::*;
 
-use std::collections::HashSet;
-
 pub struct TypeDef {
     kind: TypeKind,
     identifier: String,
@@ -51,7 +49,7 @@ impl TypeDef {
         def
     }
 
-    pub fn to_rust_code(&self, varlen_arrays: &mut HashSet<String>) -> QuoteTokenStream {
+    pub fn to_rust_code(&self) -> QuoteTokenStream {
         // Name of new Type, that is being defined
         let new_ident = self.identifier.to_string();
         let formatted_ident = format_ident!("{}", new_ident);
@@ -76,13 +74,12 @@ impl TypeDef {
                 quote!([#orig_type; #arr_size])
             }
             TypeKind::VarlenArray => {
-                varlen_arrays.insert(self.original_type.clone());
                 let orig_type = format_ident!(
-                    "{}_var_arr",
+                    "{}",
                     convert_primitve_type(&self.original_type)
                         .unwrap_or_else(|| &self.original_type)
                 );
-                quote!(#orig_type)
+                quote!(Vec<#orig_type>)
             }
         };
         let code = quote! {
