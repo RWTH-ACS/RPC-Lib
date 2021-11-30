@@ -1,30 +1,72 @@
-file = _{ SOI ~ (typedef_rule | struct_rule | union_rule)* ~ program_rule ~ EOI}
+file = _{ SOI ~	 specification* ~ program_def ~ EOI}
 
-program_rule = {"program " ~ identifier ~ "{" ~ version_rule ~ "}" ~ "=" ~ integer ~ ";"}
-version_rule = {"version " ~ identifier ~ "{" ~ function_rule* ~ "}" ~ "=" ~ integer ~ ";"}
+// RPCL-Additions to XDR
+program_def = {"program" ~ identifier ~ "{" ~ version_def+ ~ "}" ~ "=" ~ constant ~ ";" }
+version_def = {"version" ~ identifier ~ "{" ~ procedure_def+ ~ "}" ~ "=" ~ constant ~ ";" }
+procedure_def = { proc_return ~  identifier ~ "(" ~ proc_args ~ ")" ~ "=" ~ value ~ ";" }
+proc_return = { type_specifier }
+proc_args = { void | type_specifier ~ ("," ~ type_specifier)* }
 
-function_rule = { type_ident ~ func_ident ~ "(" ~ parameter_list  ~ ")" ~ "=" ~ integer ~ ";" }
-parameter_list = { parameter* ~ ("," ~ parameter)* }
-parameter = _{ (built_in_type | identifier) ~ identifier? }
-func_ident = @{ identifier }
+// XDR
+specification = { definition+ }
+definition = _{ type_def | enum_def | struct_def | union_def | constant_def }
 
-struct_rule = { "struct" ~ identifier ~ "{" ~ (type_name_pair ~ ";")* ~ "}" ~ ";" }
-typedef_rule = { "typedef" ~ type_ident ~ (array | identifier) ~ ";" }
-union_rule = { "union" ~ type_ident ~ "switch" ~ "(" ~ type_name_pair ~ ")" ~ "{" ~ "case" ~ integer ~ ":" ~ type_name_pair ~ ";" ~ "default:" ~ identifier ~ ";" ~ "}" ~ ";" }
+// XDR - Typedefs
+type_def = { "typedef" ~ declaration ~ ";" }
+enum_def = { "enum" ~ identifier ~ enum_body ~ ";" }
+struct_def = { "struct" ~ identifier ~ struct_body ~ ";" }
+union_def = { "union" ~ identifier ~ union_body ~ ";" }
+constant_def = {"const" ~ identifier ~ "=" ~ constant ~ ";" }
 
-type_name_pair = { type_ident ~ (array | identifier) }
-array = _{ array_fixed | array_varlen }
-array_fixed = { identifier ~ "[" ~ integer ~ "]" }
-array_varlen = { identifier ~ "<" ~ integer? ~ ">" }
+// XDR - Discriminated Unions
+union_type_spec = { "union" ~ union_body }
+union_body = { "switch" ~ "(" ~ discriminant_decl ~ ")" ~ "{" ~ case_spec+ ~ "default" ~ ":" ~ declaration ~ ";" ~ "}" }
+case_spec = { ("case" ~ value ~ ":")+ ~ declaration ~ ";" }
+discriminant_decl = { declaration }
 
-type_ident = ${ pre_declared_struct | built_in_type ~ &WHITESPACE+ | identifier}
-pre_declared_struct = _{ "struct" ~ WHITESPACE+ ~ identifier }
-built_in_type = @{ rpcl_string | (signed ~ WHITESPACE+)? ~ ("char" | "short" | "int" | "long") }
+// XDR - Structs
+struct_type_spec = { "struct" ~ struct_body }
+struct_body = {"{" ~ (declaration ~ ";")+ ~ "}" }
 
-integer = @{ ASCII_DIGIT+ }
-identifier = @{("_" | ASCII_ALPHA) ~ ("_" | ASCII_ALPHANUMERIC)*}
-signed = _{ "signed" | "unsigned" }
-rpcl_string = @{ "string<>" | "string" }
+// XDR - Enums
+enum_type_spec = { "enum" ~ enum_body }
+enum_body = { "{" ~ enum_case ~ ("," ~ enum_case)* ~ "}" }
+enum_case = { identifier ~ "=" ~ value }
+
+// XDR - Declaration
+declaration = {
+	pointer
+    | string_decl
+    | varlen_array
+    | fixedlen_array
+    | normal_type_name_decl
+    | void }
+void = { "void" }
+pointer = { type_specifier ~ "*" ~ identifier }
+varlen_array = { type_specifier ~ identifier ~ "<" ~ value? ~ ">" }
+fixedlen_array = { type_specifier ~ identifier ~ "[" ~ value? ~  "]" }
+normal_type_name_decl = { type_specifier ~ identifier }
+string_decl = { "string" ~ identifier ~ "<" ~ value? ~ ">" }
+
+// XDR - Types
+type_specifier = {
+    primitive_type
+    | void
+    | enum_type_spec
+    | struct_type_spec
+    | union_type_spec
+    | identifier }
+primitive_type = @{
+    (("unsigned" ~ WHITESPACE+)? ~ "int"
+    | ("unsigned" ~ WHITESPACE+)? ~ "hyper"
+    | "float" | "double" | "quadruple"
+    | "bool"
+    | "string<>" | "string" ) ~ !(ASCII_ALPHANUMERIC | "_" )
+}
+
+value = { constant | identifier }
+constant = @{ "0x" ~ ASCII_HEX_DIGIT+ | "0" ~ ASCII_OCT_DIGIT+ | "-"? ~ ASCII_DIGIT+ }
+identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" )* }
 
 WHITESPACE = _{ " " | "\t" | "\n" }
 COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
