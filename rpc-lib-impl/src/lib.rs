@@ -11,7 +11,6 @@ use std::io::prelude::*;
 use std::path::Path;
 
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, DeriveInput};
 
 mod parser;
 
@@ -42,7 +41,7 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
         .to_string();
 
     //Parsing
-    let (type_code, prog_num, ver_num) = parser::parse(&s, &struct_name);
+    let (generated_code, prog_num, ver_num) = parser::parse(&s, &struct_name);
 
     let name = format_ident!("{}", struct_name);
     let common_code = quote! {
@@ -60,11 +59,12 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    let generated_code = parse_macro_input!(type_code as DeriveInput);
     let code = quote! {
-        #generated_code
         #common_code
+        #generated_code
     };
+
+    println!("{}", code);
 
     code.into()
 }

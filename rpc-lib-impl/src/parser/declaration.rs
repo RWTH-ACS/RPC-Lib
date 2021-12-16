@@ -1,4 +1,6 @@
 use crate::parser::parser::Rule;
+use proc_macro2::TokenStream;
+use quote::quote;
 
 use super::constant::Value;
 use super::datatype::DataType;
@@ -17,6 +19,31 @@ pub struct Declaration {
     pub decl_type: DeclarationType,
     pub data_type: DataType, // e.g. int(-array), (optional)char, (varlen-)double
     pub name: String,
+}
+
+impl From<Declaration> for TokenStream {
+    fn from(decl: Declaration) -> TokenStream {
+        let data_type: TokenStream = decl.data_type.into();
+        let name = quote::format_ident!("{}", decl.name);
+        match decl.decl_type {
+            DeclarationType::Optional => {
+                quote!(#name: std::Result<#data_type, i32>)
+            }
+            DeclarationType::VarlenArray => {
+                quote!(#name: std::vec::Vec<#data_type>)
+            }
+            DeclarationType::FixedlenArray { length } => {
+                let len: TokenStream = length.into();
+                quote!(#name: [#data_type; #len])
+            }
+            DeclarationType::TypeNameDecl => {
+                quote!(#name: #data_type)
+            }
+            DeclarationType::VoidDecl => {
+                quote!()
+            }
+        }.into()
+    }
 }
 
 fn parse_optional(pointer: pest::iterators::Pair<'_, Rule>) -> Declaration {

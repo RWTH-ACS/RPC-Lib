@@ -1,5 +1,8 @@
 use crate::parser::parser::Rule;
 
+use proc_macro2::TokenStream;
+use quote::quote;
+
 use super::constant::Value;
 
 #[derive(PartialEq)]
@@ -11,6 +14,31 @@ pub struct Enumdef {
 #[derive(PartialEq)]
 pub struct Enum {
     pub cases: std::vec::Vec<(String, Value)>,
+}
+
+impl From<Enumdef> for TokenStream {
+    fn from(enum_def: Enumdef) -> TokenStream {
+        let name = quote::format_ident!("{}", enum_def.name);
+        let enum_body: TokenStream = enum_def.enum_body.into();
+        quote!(enum #name #enum_body)
+    }
+}
+
+impl From<Enum> for TokenStream {
+    fn from(en: Enum) -> TokenStream {
+        let mut code = quote!();
+        for (case_ident, case_value) in en.cases {
+            match case_value {
+                Value::Numeric { val } => {
+                    code = quote!(#code #case_ident = #val as isize,);
+                }
+                Value::Named { name } => {
+                    code = quote!(#code #case_ident = #name,);
+                }
+            }
+        }
+        quote!( { #code } )
+    }
 }
 
 pub fn parse_enum_type_spec(enum_type_spec: pest::iterators::Pair<'_, Rule>) -> Enum {

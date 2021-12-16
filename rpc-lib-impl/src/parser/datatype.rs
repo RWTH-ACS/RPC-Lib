@@ -1,4 +1,6 @@
 use crate::parser::parser::Rule;
+use proc_macro2::TokenStream;
+use quote::quote;
 
 use super::enumdef::{parse_enum_type_spec, Enum};
 use super::structdef::{parse_struct_type_spec, Struct};
@@ -15,6 +17,60 @@ pub enum DataType {
     Union { def: Union },
     Enum { def: Enum },
     Void,
+}
+
+impl From<DataType> for TokenStream {
+    fn from(data_type: DataType) -> TokenStream {
+        match data_type {
+            DataType::Integer { length, signed } => {
+                match signed {
+                    true => {
+                        match length {
+                            32 => quote!(i32),
+                            64 => quote!(i64),
+                            _ => panic!(""),
+                        }
+                    }
+                    false => {
+                        match length {
+                            32 => quote!(u32),
+                            64 => quote!(u64),
+                            _ => panic!(""),
+                        }
+                    }
+                }
+            }
+            DataType::Float { length } => {
+                match length {
+                    32 => quote!(f32),
+                    64 => quote!(f64),
+                    _ => panic!(""),
+                }
+            }
+            DataType::String => {
+                quote!(String)
+            }
+            DataType::Boolean => {
+                quote!(bool)
+            }
+            DataType::TypeDef { name } => {
+                let ident = quote::format_ident!("{}", name);
+                quote!(#ident)
+            }
+            DataType::Struct { def } => {
+                panic!();
+            }
+            DataType::Union { def } => {
+                panic!();
+            }
+            DataType::Enum { def } => {
+                panic!();
+            }
+            DataType::Void => {
+                quote!()
+            }
+        }.into()
+    }
 }
 
 fn parse_primitive(primitive_type: pest::iterators::Pair<'_, Rule>) -> DataType {

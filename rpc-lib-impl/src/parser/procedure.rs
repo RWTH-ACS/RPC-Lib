@@ -1,13 +1,49 @@
 use crate::parser::parser::Rule;
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
 
 use super::constant::Value;
 use super::datatype::DataType;
 
-struct Procedure {
+pub struct Procedure {
     name: String,
     return_type: DataType,
     args: std::vec::Vec<DataType>,
     num: Value,
+}
+
+impl From<Procedure> for TokenStream {
+    fn from(proc: Procedure) -> TokenStream {
+        let proc_name = format_ident!("{}", proc.name);
+        let mut args = quote!();
+        let mut serialization_code = quote!( let mut send_data = std::vec::Vec::new(); );
+        let mut i = 0;
+        for arg in proc.args {
+            let arg_name = format_ident!("x{}", i.to_string());
+            let arg_type: TokenStream = arg.into();
+            args = quote!( #args #arg_name: #arg_type,);
+            serialization_code = quote!( #serialization_code send_data.extend(#arg_name.serialize()); );
+            i = i + 1;
+        }
+        let proc_num: TokenStream = proc.num.into();
+        if proc.return_type == DataType::Void {
+            quote!{ fn #proc_name (&self, #args) { }}
+        }
+        else {
+            let return_type: TokenStream = proc.return_type.into();
+            quote!{ fn #proc_name (&self, #args) -> #return_type {
+                // Parameter-Seralization
+                #serialization_code
+
+                // Call
+                let recv = rpc_lib::rpc_call(&self.client, #proc_num, &send_data);
+
+                // Parse ReplyHeader
+                let mut parse_index = 0;
+                <#return_type>::deserialize(recv, &mut parse_index);
+            }}
+        }
+    }
 }
 
 impl From<pest::iterators::Pair<'_, Rule>> for Procedure {

@@ -1,8 +1,24 @@
 use crate::parser::parser::Rule;
+use proc_macro2::TokenStream;
+use quote::quote;
 
-struct Program {
-    program_number: u32,
-    versions: std::vec::Vec<Version>,
+use super::procedure::Procedure;
+
+pub struct Program {
+    pub program_number: u32,
+    pub versions: std::vec::Vec<Version>,
+}
+
+impl From<Program> for TokenStream {
+    fn from(program: Program) -> TokenStream {
+        assert!(program.versions.len() == 1, "Multiple Versions not supported!");
+        let mut version_code = quote!();
+        for version in program.versions {
+            let code: TokenStream = version.into();
+            version_code = quote!( #version_code #code )
+        }
+        version_code
+    }
 }
 
 impl From<pest::iterators::Pair<'_, Rule>> for Program {
@@ -32,9 +48,20 @@ impl From<pest::iterators::Pair<'_, Rule>> for Program {
     }
 }
 
-struct Version {
-    version_number: u32,
-    procedures: std::vec::Vec<u32>,
+pub struct Version {
+    pub version_number: u32,
+    procedures: std::vec::Vec<Procedure>,
+}
+
+impl From<Version> for TokenStream {
+    fn from(version: Version) -> TokenStream {
+        let mut code = quote!();
+        for proc in version.procedures {
+            let proc_code: TokenStream = proc.into();
+            code = quote!( #code #proc_code );
+        }
+        code
+    }
 }
 
 impl From<pest::iterators::Pair<'_, Rule>> for Version {
@@ -48,7 +75,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Version {
             match x.as_rule() {
                 Rule::procedure_def => {
                     // Inner Version Rule
-                    vers.procedures.push(0);
+                    vers.procedures.push(Procedure::from(x));
                 }
                 Rule::identifier => {
                     // Name of program

@@ -1,11 +1,22 @@
 use crate::parser::parser::Rule;
 
+use proc_macro2::TokenStream;
+use quote::quote;
+
 use super::datatype::DataType;
 use super::declaration::Declaration;
 
 pub struct Typedef {
     name: String,
     orig_type: DataType,
+}
+
+impl From<Typedef> for TokenStream {
+    fn from(type_def: Typedef) -> TokenStream {
+        let orig_type: TokenStream = type_def.orig_type.into();
+        let name = quote::format_ident!("{}", type_def.name);
+        quote!(type #name = #orig_type;)
+    }
 }
 
 impl From<pest::iterators::Pair<'_, Rule>> for Typedef {

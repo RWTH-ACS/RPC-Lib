@@ -1,5 +1,8 @@
 use crate::parser::parser::Rule;
 
+use proc_macro2::TokenStream;
+use quote::quote;
+
 use super::constant::Value;
 use super::datatype::DataType;
 use super::declaration::{Declaration, DeclarationType};
@@ -14,6 +17,63 @@ pub struct Uniondef {
 pub struct Union {
     cases: std::vec::Vec<(Value, Declaration)>,
     default: std::boxed::Box<Declaration>,
+}
+
+impl From<Uniondef> for TokenStream {
+    fn from(union_def: Uniondef) -> TokenStream {
+        let name = quote::format_ident!("{}", union_def.name);
+
+        // Deserialize
+        let mut match_code = quote!();
+        for (val, decl) in union_def.union_body.cases {
+            let case_name = quote::format_ident!("Case{}", val);
+            match_code = quote!( #match_code #val => #name :: #case_name { data: },);
+        }
+
+        // Paste together
+        let union_body: TokenStream = union_def.union_body.into();
+        quote!{
+            enum #name #union_body
+
+            impl Xdr for #name {
+                fn serialize(&self) -> std::vec::Vec<u8> {
+                    let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+                    panic!("TODO Implement");
+                    // TODO
+                    vec
+                }
+
+                fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
+                    let err_code = i32::deserialize(bytes, parse_index);
+                    match err_code {
+                        #match_code
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl From<Union> for TokenStream {
+    fn from(un: Union) -> TokenStream {
+        let mut code = quote!();
+        for (value, decl) in un.cases {
+            let enum_item = quote::format_ident!("Case{}", match value {
+                Value::Numeric { val } => val.to_string(),
+                Value::Named { name } => name,
+            });
+            let declaration: TokenStream = decl.into();
+            code = quote!(#code #enum_item { #declaration }, );
+        }
+        if un.default.decl_type == DeclarationType::VoidDecl {
+            code = quote!( #code Default,);
+        } else {
+            let def: TokenStream = (*un.default).into();
+            code = quote!( #code Default { #def } );
+        }
+        code = quote!({ #code });
+        code.into()
+    }
 }
 
 pub fn parse_union_type_spec(union_type_spec: pest::iterators::Pair<'_, Rule>) -> Union {

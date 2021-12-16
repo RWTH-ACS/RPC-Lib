@@ -1,5 +1,8 @@
 use crate::parser::parser::Rule;
 
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens, TokenStreamExt};
+
 pub struct ConstantDeclaration {
     name: String,
     value: Value,
@@ -9,6 +12,41 @@ pub struct ConstantDeclaration {
 pub enum Value {
     Numeric { val: i64 },
     Named { name: String },
+}
+
+impl From<ConstantDeclaration> for TokenStream {
+    fn from(constant: ConstantDeclaration) -> TokenStream {
+        let name = constant.name;
+        let value: TokenStream = constant.value.into();
+        quote!(const #name = #value)
+    }
+}
+
+impl ToTokens for Value {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            Value::Numeric { val } => {
+                tokens.append(quote!( #val ).into());
+            }
+            Value::Named { name } => {
+                let ident = quote::format_ident!("{}", name);
+                tokens.append(quote!( #ident ).into());
+            }
+        }
+    }
+}
+
+impl From<Value> for TokenStream {
+    fn from(value: Value) -> TokenStream {
+        match value {
+            Value::Numeric { val } => {
+                quote!(#val)
+            }
+            Value::Named { name } => {
+                quote!(#name)
+            }
+        }.into()
+    }
 }
 
 fn parse_num(constant: pest::iterators::Pair<'_, Rule>) -> i64 {

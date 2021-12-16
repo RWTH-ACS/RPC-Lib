@@ -1,5 +1,8 @@
 use crate::parser::parser::Rule;
 
+use proc_macro2::TokenStream;
+use quote::quote;
+
 use super::declaration::Declaration;
 
 #[derive(PartialEq)]
@@ -10,7 +13,58 @@ pub struct Structdef {
 
 #[derive(PartialEq)]
 pub struct Struct {
-    fields: std::vec::Vec<Declaration>,
+    pub fields: std::vec::Vec<Declaration>,
+}
+
+impl From<Structdef> for TokenStream {
+    fn from(struct_def: Structdef) -> TokenStream {
+        // Name
+        let name = quote::format_ident!("{}", struct_def.name);
+        let struct_body = struct_def.struct_body;
+
+        // Serialization
+        let mut serialization_code = quote!();
+        let mut deserialization_code = quote!();
+
+        for field in &struct_body.fields {
+            let field_name = quote::format_ident!("{}", &field.name);
+            // let field_type: TokenStream = field.data_type.into();
+            serialization_code = quote!{
+                #serialization_code vec.extend(#field_name.serialize());
+            };
+        }
+
+        let code = quote!{
+            impl Xdr for #name {
+                fn serialize(&self) -> std::vec::Vec<u8> {
+                    let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+                    #serialization_code
+                    vec
+                }
+
+                fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
+                    #name {
+                        #deserialization_code
+                    }
+                }
+            }
+        };
+
+        // Struct
+        let struct_body_code: TokenStream = struct_body.into();
+        quote!(struct #name #struct_body_code #code )
+    }
+}
+
+impl From<Struct> for TokenStream {
+    fn from(st: Struct) -> TokenStream {
+        let mut code = quote!();
+        for decl in st.fields {
+            let decl: TokenStream = decl.into();
+            code = quote!(#code #decl,);
+        }
+        quote!( { #code } )
+    }
 }
 
 pub fn parse_struct_type_spec(struct_type_spec: pest::iterators::Pair<'_, Rule>) -> Struct {

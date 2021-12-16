@@ -1,17 +1,47 @@
 use crate::parser::parser::Rule;
 
+use proc_macro2::TokenStream;
+use quote::quote;
+
 use super::constant::ConstantDeclaration;
 use super::enumdef::Enumdef;
 use super::structdef::Structdef;
 use super::typedef::Typedef;
 use super::uniondef::Uniondef;
 
-struct Specification {
+pub struct Specification {
     typedefs: std::vec::Vec<Typedef>,
     enums: std::vec::Vec<Enumdef>,
     structs: std::vec::Vec<Structdef>,
     unions: std::vec::Vec<Uniondef>,
     constants: std::vec::Vec<ConstantDeclaration>,
+}
+
+impl From<Specification> for TokenStream {
+    fn from(spec: Specification) -> TokenStream {
+        let mut code = quote!();
+        for typedef in spec.typedefs {
+            let def: TokenStream = typedef.into();
+            code = quote!( #code #def );
+        }
+        for enumdef in spec.enums {
+            let def: TokenStream = enumdef.into();
+            code = quote!( #code #def );
+        }
+        for structdef in spec.structs {
+            let def: TokenStream = structdef.into();
+            code = quote!( #code #def );
+        }
+        for uniondef in spec.unions {
+            let def: TokenStream = uniondef.into();
+            code = quote!( #code #def );
+        }
+        for constant in spec.constants {
+            let def: TokenStream = constant.into();
+            code = quote!( #code #def );
+        }
+        quote!(type opaque = std::vec::Vec<u8>; #code)
+    }
 }
 
 impl From<pest::iterators::Pair<'_, Rule>> for Specification {
