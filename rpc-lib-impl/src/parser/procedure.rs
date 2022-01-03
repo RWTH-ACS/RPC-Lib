@@ -36,11 +36,11 @@ impl From<Procedure> for TokenStream {
                 #serialization_code
 
                 // Call
-                let recv = rpc_lib::rpc_call(&self.client, #proc_num, &send_data);
+                let recv = rpc_lib::rpc_call(&self.client, #proc_num as u32, &send_data);
 
                 // Parse ReplyHeader
                 let mut parse_index = 0;
-                <#return_type>::deserialize(recv, &mut parse_index);
+                <#return_type>::deserialize(&recv, &mut parse_index)
             }}
         }
     }

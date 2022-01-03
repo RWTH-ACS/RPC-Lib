@@ -25,13 +25,16 @@ impl From<Structdef> for TokenStream {
         // Serialization
         let mut serialization_code = quote!();
         let mut deserialization_code = quote!();
+        let mut struct_body_code = quote!();
 
-        for field in &struct_body.fields {
+        for field in struct_body.fields {
             let field_name = quote::format_ident!("{}", &field.name);
-            // let field_type: TokenStream = field.data_type.into();
+            let field_type: TokenStream = field.data_type.into();
             serialization_code = quote!{
-                #serialization_code vec.extend(#field_name.serialize());
+                #serialization_code vec.extend(self.#field_name.serialize());
             };
+            struct_body_code = quote!( #struct_body_code #field_name: #field_type, );
+            deserialization_code = quote!( #deserialization_code #field_name: <#field_type> :: deserialize(bytes, parse_index), )
         }
 
         let code = quote!{
@@ -51,8 +54,12 @@ impl From<Structdef> for TokenStream {
         };
 
         // Struct
-        let struct_body_code: TokenStream = struct_body.into();
-        quote!(struct #name #struct_body_code #code )
+        quote!{
+            struct #name {
+                #struct_body_code
+            }
+            #code
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::parser::parser::Rule;
 
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens, TokenStreamExt};
+use quote::quote;
 
 pub struct ConstantDeclaration {
     name: String,
@@ -19,20 +19,6 @@ impl From<ConstantDeclaration> for TokenStream {
         let name = constant.name;
         let value: TokenStream = constant.value.into();
         quote!(const #name = #value)
-    }
-}
-
-impl ToTokens for Value {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        match self {
-            Value::Numeric { val } => {
-                tokens.append(quote!( #val ).into());
-            }
-            Value::Named { name } => {
-                let ident = quote::format_ident!("{}", name);
-                tokens.append(quote!( #ident ).into());
-            }
-        }
     }
 }
 

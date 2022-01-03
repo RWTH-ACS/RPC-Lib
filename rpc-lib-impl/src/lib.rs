@@ -64,7 +64,5 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
         #generated_code
     };
 
-    println!("{}", code);
-
     code.into()
 }

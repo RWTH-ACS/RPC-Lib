@@ -20,7 +20,7 @@ constant_def = {"const" ~ identifier ~ "=" ~ constant ~ ";" }
 
 // XDR - Discriminated Unions
 union_type_spec = { "union" ~ union_body }
-union_body = { "switch" ~ "(" ~ discriminant_decl ~ ")" ~ "{" ~ case_spec+ ~ "default" ~ ":" ~ declaration ~ ";" ~ "}" }
+union_body = { "switch" ~ "(" ~ discriminant_decl ~ ")" ~ "{" ~ case_spec+ ~ ("default" ~ ":" ~ declaration ~ ";")? ~ "}" }
 case_spec = { ("case" ~ value ~ ":")+ ~ declaration ~ ";" }
 discriminant_decl = { declaration }
 

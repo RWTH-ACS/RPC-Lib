@@ -25,15 +25,32 @@ impl From<Uniondef> for TokenStream {
 
         // Deserialize
         let mut match_code = quote!();
+        let mut union_body = quote!();
         for (val, decl) in union_def.union_body.cases {
-            let case_name = quote::format_ident!("Case{}", val);
-            match_code = quote!( #match_code #val => #name :: #case_name { data: },);
+            let case_ident = quote::format_ident!("{}", match val {
+                Value::Numeric { val } => val.to_string(),
+                Value::Named { name } => name.to_string(),
+            });
+            let case_name = quote::format_ident!("Case{}", case_ident);
+            match decl.data_type {
+                DataType::Void => {
+                    match_code = quote!( #match_code #case_ident => #name :: #case_name, ); 
+                    union_body = quote!( #union_body #case_name,);
+                }
+                _ => {
+                    let data_type_code: TokenStream = decl.data_type.into();
+                    let decl_name_code = quote::format_ident!("{}", decl.name);
+                    match_code = quote!( #match_code #case_ident => #name :: #case_name { #decl_name_code: <#data_type_code> :: deserialize(bytes, parse_index) },);
+                    union_body = quote!( #union_body #case_name { #decl_name_code: #data_type_code},);
+                }
+            }
         }
 
         // Paste together
-        let union_body: TokenStream = union_def.union_body.into();
         quote!{
-            enum #name #union_body
+            enum #name {
+                #union_body
+            }
 
             impl Xdr for #name {
                 fn serialize(&self) -> std::vec::Vec<u8> {
@@ -47,32 +64,11 @@ impl From<Uniondef> for TokenStream {
                     let err_code = i32::deserialize(bytes, parse_index);
                     match err_code {
                         #match_code
+                        _ => panic!(""),
                     }
                 }
             }
         }
-    }
-}
-
-impl From<Union> for TokenStream {
-    fn from(un: Union) -> TokenStream {
-        let mut code = quote!();
-        for (value, decl) in un.cases {
-            let enum_item = quote::format_ident!("Case{}", match value {
-                Value::Numeric { val } => val.to_string(),
-                Value::Named { name } => name,
-            });
-            let declaration: TokenStream = decl.into();
-            code = quote!(#code #enum_item { #declaration }, );
-        }
-        if un.default.decl_type == DeclarationType::VoidDecl {
-            code = quote!( #code Default,);
-        } else {
-            let def: TokenStream = (*un.default).into();
-            code = quote!( #code Default { #def } );
-        }
-        code = quote!({ #code });
-        code.into()
     }
 }
 
