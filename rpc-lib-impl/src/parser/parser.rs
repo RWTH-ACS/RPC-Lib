@@ -41,7 +41,6 @@ pub fn parse(x_file: &String, struct_name: &String) -> (TokenStream, u32, u32) {
             }
         }
     }
-
     (code.into(), program_number, version_number)
 }
 

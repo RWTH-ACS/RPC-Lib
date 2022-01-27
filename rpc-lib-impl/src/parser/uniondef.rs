@@ -27,29 +27,29 @@ impl From<Uniondef> for TokenStream {
         let mut match_code = quote!();
         let mut union_body = quote!();
         for (val, decl) in union_def.union_body.cases {
-            let case_ident = quote::format_ident!("{}", match val {
+            let case_ident = match val {
                 Value::Numeric { val } => val.to_string(),
                 Value::Named { name } => name.to_string(),
-            });
+            };
             let case_name = quote::format_ident!("Case{}", case_ident);
             match decl.data_type {
                 DataType::Void => {
-                    match_code = quote!( #match_code #case_ident => #name :: #case_name, ); 
+                    match_code = quote!( #match_code 0 => #name :: #case_name, ); 
                     union_body = quote!( #union_body #case_name,);
                 }
                 _ => {
                     let data_type_code: TokenStream = decl.data_type.into();
                     let decl_name_code = quote::format_ident!("{}", decl.name);
-                    match_code = quote!( #match_code #case_ident => #name :: #case_name { #decl_name_code: <#data_type_code> :: deserialize(bytes, parse_index) },);
+                    match_code = quote!( #match_code 0 => #name :: #case_name { #decl_name_code: <#data_type_code> :: deserialize(bytes, parse_index) },);
                     union_body = quote!( #union_body #case_name { #decl_name_code: #data_type_code},);
                 }
             }
         }
-
         // Paste together
         quote!{
             enum #name {
                 #union_body
+                CaseDefault, 
             }
 
             impl Xdr for #name {
@@ -64,7 +64,7 @@ impl From<Uniondef> for TokenStream {
                     let err_code = i32::deserialize(bytes, parse_index);
                     match err_code {
                         #match_code
-                        _ => panic!(""),
+                        _ => panic!("Default or unknown field of variant: Field-Value: {}", err_code),
                     }
                 }
             }

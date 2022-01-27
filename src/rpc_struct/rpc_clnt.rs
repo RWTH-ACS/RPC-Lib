@@ -56,9 +56,10 @@ impl Xdr for FragmentHeader {
         let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
         *parse_index += 4;
         let num = u32::from_be_bytes(*x);
+        // First Bit: Last Fragment Flag, 31 following bits: Length
         FragmentHeader {
-            last_fragment: (1 << 31) & num != 0,
-            length: num - (1 << 31),
+            last_fragment: num & 0x80000000u32 != 0,
+            length: num & 0x7FFFFFFFu32,
         }
     }
 }
@@ -67,7 +68,7 @@ impl Xdr for FragmentHeader {
 struct RpcCall {
     fragment_header: FragmentHeader,
     xid: u32,
-    msg_type: u32, // (Call: 0, Replay: 1)
+    msg_type: u32, // (Call: 0, Reply: 1)
 }
 
 impl Xdr for RpcCall {
@@ -215,11 +216,8 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> RpcClient {
     // Proc 3: GETADDR
     let vec = rpc_call(&client, 3, &rpcb.serialize());
 
-    // Parse Result
+    // Parse Universal Address
     let mut parse_index = 0;
-    // Response Header
-    let _response = RpcReply::deserialize(&vec, &mut parse_index);
-    // Universal Address
     let universal_address_s = String::deserialize(&vec, &mut parse_index);
     let addr = UniversalAddress::from_string(&universal_address_s);
 
@@ -235,6 +233,7 @@ pub fn rpc_call(client: &RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u8> {
     let rpc_req_len = 40;
     let length = u32::try_from(rpc_req_len + send.len()).unwrap();
 
+    // println!("[Rpc-Lib] Request Procedure: {}", procedure);
     let request = RpcRequest {
         header: RpcCall {
             fragment_header: FragmentHeader {
@@ -258,17 +257,21 @@ pub fn rpc_call(client: &RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u8> {
 
     // Send Request
     let request_header = request.serialize();
-    stream
-        .write(&request_header)
-        .expect("rpc_call: Failed to send data");
+    stream.write(&request_header).expect("rpc_call: Failed to send data");
     stream.write(&*send).expect("rpc_call: Failed to send data");
 
-    // Receive Reply
-    let mut buf: [u8; 2048] = [0; 2048];
-    let rec = stream
-        .read(&mut buf)
-        .expect("rpc_call: Failed to receive data");
-    let mut vec = Vec::new();
-    vec.extend_from_slice(&buf[0..rec]);
+    // Receive Header
+    let mut header_buf: [u8; 28] = [0; 28];
+    let rec = stream.read(&mut header_buf).expect("rpc_call: Failed to receive data");
+    let mut index = 0usize;
+    let reply_header = RpcReply::deserialize(&header_buf.to_vec(), &mut index);
+    let reply_length = reply_header.header.fragment_header.length as usize;
+    // println!("  Reply Length (Header-Field): {} Actual Header length: {} Actually read {} bytes", reply_length, index, rec);
+
+    // Receive Reply-Data
+    let mut vec = Vec::with_capacity(reply_length - 24);
+    unsafe{ vec.set_len(reply_length - 24); }
+    let rec = stream.read(vec.as_mut_slice()).expect("rpc_call: Failed to receive data");
+    // println!("  Read {} bytes Reply-Data", rec);
     vec
 }
