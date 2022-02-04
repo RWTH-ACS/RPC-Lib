@@ -19,8 +19,8 @@ pub enum DataType {
     Void,
 }
 
-impl From<DataType> for TokenStream {
-    fn from(data_type: DataType) -> TokenStream {
+impl From<&DataType> for TokenStream {
+    fn from(data_type: &DataType) -> TokenStream {
         match data_type {
             DataType::Integer { length, signed } => {
                 match signed {
@@ -57,13 +57,13 @@ impl From<DataType> for TokenStream {
                 let ident = quote::format_ident!("{}", name);
                 quote!(#ident)
             }
-            DataType::Struct { def } => {
+            DataType::Struct { def: _ } => {
                 panic!();
             }
-            DataType::Union { def } => {
+            DataType::Union { def: _ } => {
                 panic!();
             }
-            DataType::Enum { def } => {
+            DataType::Enum { def: _ } => {
                 panic!();
             }
             DataType::Void => {

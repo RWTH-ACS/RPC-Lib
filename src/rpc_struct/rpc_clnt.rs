@@ -164,7 +164,7 @@ struct UniversalAddress {
 pub struct RpcClient {
     program: u32,
     version: u32,
-    univ_addr: UniversalAddress,
+    stream: TcpStream,
 }
 
 impl UniversalAddress {
@@ -199,10 +199,11 @@ impl UniversalAddress {
 
 // Create Client
 pub fn clnt_create(address: &str, program: u32, version: u32) -> RpcClient {
-    let client = RpcClient {
+    let univ_addr_portmap = UniversalAddress::from_string(&(String::from(address) + ".0.111")); // Port of Portmap Service in universal address format
+    let mut client = RpcClient {
         program: 100000,
         version: 4,
-        univ_addr: UniversalAddress::from_string(&(String::from(address) + ".0.111")), // Port of Portmap Service in universal address format
+        stream: TcpStream::connect(univ_addr_portmap.to_string()).expect("rpc_call: Failed to connect"),
     };
 
     let rpcb = Rpcb {
@@ -214,31 +215,34 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> RpcClient {
     };
 
     // Proc 3: GETADDR
-    let vec = rpc_call(&client, 3, &rpcb.serialize());
+    let vec = rpc_call(&mut client, 3, &rpcb.serialize());
 
-    // Parse Universal Address
+    // Parse Universal Address & Convert to Standard IP-Format
     let mut parse_index = 0;
     let universal_address_s = String::deserialize(&vec, &mut parse_index);
-    let addr = UniversalAddress::from_string(&universal_address_s);
+    let ip = UniversalAddress::from_string(&universal_address_s);
+
+    // Create TcpStream
+    let stream = TcpStream::connect(ip.to_string()).expect("rpc_call: Failed to connect");
 
     RpcClient {
         program: program,
         version: version,
-        univ_addr: addr,
+        stream: stream,
     }
 }
 
 // Rpc-Call
-pub fn rpc_call(client: &RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u8> {
-    let rpc_req_len = 40;
-    let length = u32::try_from(rpc_req_len + send.len()).unwrap();
+pub fn rpc_call(client: &mut RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u8> {
+    const REQUEST_HEADER_LEN: usize = 40;
+    let length = REQUEST_HEADER_LEN + send.len();
 
     // println!("[Rpc-Lib] Request Procedure: {}", procedure);
     let request = RpcRequest {
         header: RpcCall {
             fragment_header: FragmentHeader {
                 last_fragment: true, // Only one Fragment
-                length: length,
+                length: length as u32,
             },
             xid: 123456, // Random but unique number
             msg_type: 0, // Type: Call
@@ -252,17 +256,16 @@ pub fn rpc_call(client: &RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u8> {
     };
 
     // Connect
-    let addr = client.univ_addr.to_string();
-    let mut stream = TcpStream::connect(addr).expect("rpc_call: Failed to connect");
 
     // Send Request
     let request_header = request.serialize();
-    stream.write(&request_header).expect("rpc_call: Failed to send data");
-    stream.write(&*send).expect("rpc_call: Failed to send data");
+    client.stream.write(&request_header).expect("rpc_call: Failed to send data");
+    client.stream.write(&*send).expect("rpc_call: Failed to send data");
 
     // Receive Header
     let mut header_buf: [u8; 28] = [0; 28];
-    let rec = stream.read(&mut header_buf).expect("rpc_call: Failed to receive data");
+    let rec = client.stream.read(&mut header_buf).expect("rpc_call: Failed to receive data");
+    assert!(rec == 28, "rpc_call: Failed to receive data");
     let mut index = 0usize;
     let reply_header = RpcReply::deserialize(&header_buf.to_vec(), &mut index);
     let reply_length = reply_header.header.fragment_header.length as usize;
@@ -271,7 +274,8 @@ pub fn rpc_call(client: &RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u8> {
     // Receive Reply-Data
     let mut vec = Vec::with_capacity(reply_length - 24);
     unsafe{ vec.set_len(reply_length - 24); }
-    let rec = stream.read(vec.as_mut_slice()).expect("rpc_call: Failed to receive data");
+    let rec = client.stream.read(vec.as_mut_slice()).expect("rpc_call: Failed to receive data");
+    assert!(rec == reply_length - 24, "rpc_call: Failed to receive data");
     // println!("  Read {} bytes Reply-Data", rec);
     vec
 }

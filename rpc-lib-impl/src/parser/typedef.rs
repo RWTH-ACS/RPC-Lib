@@ -11,9 +11,9 @@ pub struct Typedef {
     orig_type: DataType,
 }
 
-impl From<Typedef> for TokenStream {
-    fn from(type_def: Typedef) -> TokenStream {
-        let orig_type: TokenStream = type_def.orig_type.into();
+impl From<&Typedef> for TokenStream {
+    fn from(type_def: &Typedef) -> TokenStream {
+        let orig_type: TokenStream = (&type_def.orig_type).into();
         let name = quote::format_ident!("{}", type_def.name);
         quote!(type #name = #orig_type;)
     }

@@ -12,31 +12,31 @@ pub struct Procedure {
     num: Value,
 }
 
-impl From<Procedure> for TokenStream {
-    fn from(proc: Procedure) -> TokenStream {
+impl From<&Procedure> for TokenStream {
+    fn from(proc: &Procedure) -> TokenStream {
         let proc_name = format_ident!("{}", proc.name);
         let mut args = quote!();
         let mut serialization_code = quote!( let mut send_data = std::vec::Vec::new(); );
-        let mut i = 0;
-        for arg in proc.args {
-            let arg_name = format_ident!("x{}", i.to_string());
+        let mut i: u32 = 0;
+        for arg in &proc.args {
+            let arg_name = format_ident!("x{}", i);
             let arg_type: TokenStream = arg.into();
             args = quote!( #args #arg_name: #arg_type,);
             serialization_code = quote!( #serialization_code send_data.extend(#arg_name.serialize()); );
             i = i + 1;
         }
-        let proc_num: TokenStream = proc.num.into();
+        let proc_num: TokenStream = (&proc.num).into();
         if proc.return_type == DataType::Void {
             quote!{ fn #proc_name (&self, #args) { }}
         }
         else {
-            let return_type: TokenStream = proc.return_type.into();
-            quote!{ fn #proc_name (&self, #args) -> #return_type {
+            let return_type: TokenStream = (&proc.return_type).into();
+            quote!{ fn #proc_name (&mut self, #args) -> #return_type {
                 // Parameter-Seralization
                 #serialization_code
 
                 // Call
-                let recv = rpc_lib::rpc_call(&self.client, #proc_num as u32, &send_data);
+                let recv = rpc_lib::rpc_call(&mut self.client, #proc_num as u32, &send_data);
 
                 // Parse ReplyHeader
                 let mut parse_index = 0;

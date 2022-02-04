@@ -1,11 +1,19 @@
 use crate::parser::parser::Rule;
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, format_ident};
 
 use super::constant::Value;
 use super::datatype::DataType;
 use super::declaration::{Declaration, DeclarationType};
+
+#[derive(PartialEq)]
+enum DiscriminantType {
+    Int,
+    UnsignedInt,
+    Boolean,
+    Enum{ name: String },
+}
 
 #[derive(PartialEq)]
 pub struct Uniondef {
@@ -15,18 +23,97 @@ pub struct Uniondef {
 
 #[derive(PartialEq)]
 pub struct Union {
+    discriminant: DiscriminantType,
     cases: std::vec::Vec<(Value, Declaration)>,
     default: std::boxed::Box<Declaration>,
 }
 
-impl From<Uniondef> for TokenStream {
-    fn from(union_def: Uniondef) -> TokenStream {
+fn make_deserialize_function_code(union: &Union) -> TokenStream {
+    let mut match_code = quote!();
+    match &union.discriminant {
+        DiscriminantType::Int => {
+            // Cases:
+            for (case_val, data_decl) in &union.cases {
+                let number = *match case_val {
+                    Value::Numeric { val } => val,
+                    _ => panic!("Union: Case has to be integer when discriminanttype is int!"),
+                } as i32;
+                let case_ident = format_ident!("Case{}", number as u32);
+                if data_decl.decl_type != DeclarationType::VoidDecl {
+                    let decl: TokenStream = data_decl.into();
+                    match_code = quote!( #match_code #number => Self :: #case_ident { #decl :: deserialize(bytes, parse_index) }, );
+                } else {
+                    match_code = quote!( #match_code #number => Self :: #case_ident, );
+                }
+            }
+
+            // Default-Case:
+            match_code = quote!( #match_code _ => Self :: CaseDefault, );
+        }
+        DiscriminantType::UnsignedInt => panic!("Unsigned int as discriminant not implemented yet"),
+        DiscriminantType::Boolean => panic!("Boolean as discriminant not implemented yet"),
+        DiscriminantType::Enum { name: _ } => panic!("Enum as discriminant not implemented yet"),
+    }
+
+    // Construct Function:
+    quote! {
+        fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
+            let err_code = i32::deserialize(bytes, parse_index);
+            match err_code {
+                #match_code
+                _ => panic!("Unknown field of discriminated union with Field-Value {}", err_code),
+            }
+        }
+    }
+}
+
+fn make_serialization_function_code(union: &Union) -> TokenStream {
+    let mut match_arms = quote!();
+    match &union.discriminant {
+        DiscriminantType::Int => {
+            // Cases:
+            for (case_val, data_decl) in &union.cases {
+                let number = *match case_val {
+                    Value::Numeric { val } => val,
+                    _ => panic!("Union: Case has to be integer when discriminanttype is int!"),
+                } as i32;
+                let case_ident = format_ident!("Case{}", number as u32);
+                let decl_name = format_ident!("{}", data_decl.name);
+                let decl_type: TokenStream = (&data_decl.data_type).into();
+                match_arms = quote!{ #match_arms
+                    Self :: #case_ident { #decl_name } => {
+                        vec.extend(i32::serialize(&#number));
+                        vec.extend(<#decl_type>::serialize(&#decl_name));
+                    }
+                };
+            }
+            // Default-Case:
+            match_arms = quote!{ #match_arms
+                Self::CaseDefault => {}
+            };
+        }
+        DiscriminantType::UnsignedInt => panic!("Unsigned int as discriminant not implemented yet"),
+        DiscriminantType::Boolean => panic!("Boolean as discriminant not implemented yet"),
+        DiscriminantType::Enum { name: _ } => panic!("Enum as discriminant not implemented yet"),
+    }
+    quote!{
+        fn serialize(&self) -> std::vec::Vec<u8> {
+            let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+            match self {
+                #match_arms
+            }
+            vec
+        }
+    }
+}
+
+impl From<&Uniondef> for TokenStream {
+    fn from(union_def: &Uniondef) -> TokenStream {
         let name = quote::format_ident!("{}", union_def.name);
 
         // Deserialize
-        let mut match_code = quote!();
         let mut union_body = quote!();
-        for (val, decl) in union_def.union_body.cases {
+        for (val, decl) in &union_def.union_body.cases {
             let case_ident = match val {
                 Value::Numeric { val } => val.to_string(),
                 Value::Named { name } => name.to_string(),
@@ -34,17 +121,20 @@ impl From<Uniondef> for TokenStream {
             let case_name = quote::format_ident!("Case{}", case_ident);
             match decl.data_type {
                 DataType::Void => {
-                    match_code = quote!( #match_code 0 => #name :: #case_name, ); 
                     union_body = quote!( #union_body #case_name,);
                 }
                 _ => {
-                    let data_type_code: TokenStream = decl.data_type.into();
+                    let data_type_code: TokenStream = (&decl.data_type).into();
                     let decl_name_code = quote::format_ident!("{}", decl.name);
-                    match_code = quote!( #match_code 0 => #name :: #case_name { #decl_name_code: <#data_type_code> :: deserialize(bytes, parse_index) },);
                     union_body = quote!( #union_body #case_name { #decl_name_code: #data_type_code},);
                 }
             }
         }
+
+        // Functions for Trait Xdr:
+        let deserialization_func = make_deserialize_function_code(&union_def.union_body);
+        let serialization_func = make_serialization_function_code(&union_def.union_body);
+
         // Paste together
         quote!{
             enum #name {
@@ -53,20 +143,10 @@ impl From<Uniondef> for TokenStream {
             }
 
             impl Xdr for #name {
-                fn serialize(&self) -> std::vec::Vec<u8> {
-                    let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
-                    panic!("TODO Implement");
-                    // TODO
-                    vec
-                }
 
-                fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
-                    let err_code = i32::deserialize(bytes, parse_index);
-                    match err_code {
-                        #match_code
-                        _ => panic!("Default or unknown field of variant: Field-Value: {}", err_code),
-                    }
-                }
+                #deserialization_func 
+
+                #serialization_func
             }
         }
     }
@@ -98,6 +178,7 @@ fn parse_case_spec(case_spec: pest::iterators::Pair<'_, Rule>) -> (Value, Declar
 impl From<pest::iterators::Pair<'_, Rule>> for Union {
     fn from(union_body: pest::iterators::Pair<'_, Rule>) -> Union {
         let mut union_def = Union {
+            discriminant: DiscriminantType::Int,
             cases: std::vec::Vec::new(),
             default: std::boxed::Box::new(Declaration {
                 decl_type: DeclarationType::VoidDecl,
@@ -107,7 +188,25 @@ impl From<pest::iterators::Pair<'_, Rule>> for Union {
         };
         for token in union_body.into_inner() {
             match token.as_rule() {
-                Rule::discriminant_decl => {}
+                Rule::discriminant_decl => {
+                    let decl = Declaration::from(token.into_inner().next().unwrap());
+                    union_def.discriminant = match decl.data_type {
+                        DataType::Integer { length: _, signed } => {
+                            if signed {
+                                DiscriminantType::Int
+                            } else {
+                                DiscriminantType::UnsignedInt
+                            }
+                        }
+                        DataType::Boolean => {
+                            DiscriminantType::Boolean
+                        }
+                        DataType::TypeDef { name } => {
+                            DiscriminantType::Enum { name: name}
+                        }
+                        _ => panic!("Invalid Discriminant-Type in Union"),
+                    };
+                }
                 Rule::case_spec => {
                     union_def.cases.push(parse_case_spec(token));
                 }
@@ -137,6 +236,7 @@ mod tests {
         let union_body = Union::from(parsed.next().unwrap());
 
         let un = Union {
+            discriminant: DiscriminantType::Int,
             cases: vec![
                 (
                     Value::Named { name: "X".into() },
@@ -180,6 +280,7 @@ mod tests {
         let parsed_def = Uniondef::from(parsed.next().unwrap());
 
         let un = Union {
+            discriminant: DiscriminantType::UnsignedInt,
             cases: vec![(
                 Value::Numeric { val: 1 },
                 Declaration {
@@ -216,6 +317,7 @@ mod tests {
         let union_body = parse_union_type_spec(parsed.next().unwrap());
 
         let un = Union {
+            discriminant: DiscriminantType::UnsignedInt,
             cases: vec![(
                 Value::Numeric { val: 1 },
                 Declaration {
@@ -253,6 +355,7 @@ mod tests {
         let parsed_def = Uniondef::from(parsed.next().unwrap());
 
         let un = Union {
+            discriminant: DiscriminantType::Int,
             cases: vec![
                 (
                     Value::Numeric { val: 0 },

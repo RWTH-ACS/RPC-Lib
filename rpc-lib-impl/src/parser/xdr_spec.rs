@@ -17,26 +17,26 @@ pub struct Specification {
     constants: std::vec::Vec<ConstantDeclaration>,
 }
 
-impl From<Specification> for TokenStream {
-    fn from(spec: Specification) -> TokenStream {
+impl From<&Specification> for TokenStream {
+    fn from(spec: &Specification) -> TokenStream {
         let mut code = quote!();
-        for typedef in spec.typedefs {
+        for typedef in &spec.typedefs {
             let def: TokenStream = typedef.into();
             code = quote!( #code #def );
         }
-        for enumdef in spec.enums {
+        for enumdef in &spec.enums {
             let def: TokenStream = enumdef.into();
             code = quote!( #code #def );
         }
-        for structdef in spec.structs {
+        for structdef in &spec.structs {
             let def: TokenStream = structdef.into();
             code = quote!( #code #def );
         }
-        for uniondef in spec.unions {
+        for uniondef in &spec.unions {
             let def: TokenStream = uniondef.into();
             code = quote!( #code #def );
         }
-        for constant in spec.constants {
+        for constant in &spec.constants {
             let def: TokenStream = constant.into();
             code = quote!( #code #def );
         }

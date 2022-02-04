@@ -16,20 +16,20 @@ pub struct Struct {
     pub fields: std::vec::Vec<Declaration>,
 }
 
-impl From<Structdef> for TokenStream {
-    fn from(struct_def: Structdef) -> TokenStream {
+impl From<&Structdef> for TokenStream {
+    fn from(struct_def: &Structdef) -> TokenStream {
         // Name
         let name = quote::format_ident!("{}", struct_def.name);
-        let struct_body = struct_def.struct_body;
+        let struct_body = &struct_def.struct_body;
 
         // Serialization
         let mut serialization_code = quote!();
         let mut deserialization_code = quote!();
         let mut struct_body_code = quote!();
 
-        for field in struct_body.fields {
+        for field in &struct_body.fields {
             let field_name = quote::format_ident!("{}", &field.name);
-            let field_type: TokenStream = field.data_type.into();
+            let field_type: TokenStream = (&field.data_type).into();
             serialization_code = quote!{
                 #serialization_code vec.extend(self.#field_name.serialize());
             };
@@ -63,10 +63,10 @@ impl From<Structdef> for TokenStream {
     }
 }
 
-impl From<Struct> for TokenStream {
-    fn from(st: Struct) -> TokenStream {
+impl From<&Struct> for TokenStream {
+    fn from(st: &Struct) -> TokenStream {
         let mut code = quote!();
-        for decl in st.fields {
+        for decl in &st.fields {
             let decl: TokenStream = decl.into();
             code = quote!(#code #decl,);
         }

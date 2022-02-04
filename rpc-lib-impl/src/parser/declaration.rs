@@ -21,11 +21,11 @@ pub struct Declaration {
     pub name: String,
 }
 
-impl From<Declaration> for TokenStream {
-    fn from(decl: Declaration) -> TokenStream {
-        let data_type: TokenStream = decl.data_type.into();
+impl From<&Declaration> for TokenStream {
+    fn from(decl: &Declaration) -> TokenStream {
+        let data_type: TokenStream = (&decl.data_type).into();
         let name = quote::format_ident!("{}", decl.name);
-        match decl.decl_type {
+        match &decl.decl_type {
             DeclarationType::Optional => {
                 quote!(#name: std::Result<#data_type, i32>)
             }

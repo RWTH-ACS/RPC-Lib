@@ -14,16 +14,16 @@ pub enum Value {
     Named { name: String },
 }
 
-impl From<ConstantDeclaration> for TokenStream {
-    fn from(constant: ConstantDeclaration) -> TokenStream {
-        let name = constant.name;
-        let value: TokenStream = constant.value.into();
+impl From<&ConstantDeclaration> for TokenStream {
+    fn from(constant: &ConstantDeclaration) -> TokenStream {
+        let name = &constant.name;
+        let value: TokenStream = (&constant.value).into();
         quote!(const #name = #value)
     }
 }
 
-impl From<Value> for TokenStream {
-    fn from(value: Value) -> TokenStream {
+impl From<&Value> for TokenStream {
+    fn from(value: &Value) -> TokenStream {
         match value {
             Value::Numeric { val } => {
                 quote!(#val)

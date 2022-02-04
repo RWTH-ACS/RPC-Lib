@@ -9,11 +9,11 @@ pub struct Program {
     pub versions: std::vec::Vec<Version>,
 }
 
-impl From<Program> for TokenStream {
-    fn from(program: Program) -> TokenStream {
+impl From<&Program> for TokenStream {
+    fn from(program: &Program) -> TokenStream {
         assert!(program.versions.len() == 1, "Multiple Versions not supported!");
         let mut version_code = quote!();
-        for version in program.versions {
+        for version in &program.versions {
             let code: TokenStream = version.into();
             version_code = quote!( #version_code #code )
         }
@@ -53,10 +53,10 @@ pub struct Version {
     procedures: std::vec::Vec<Procedure>,
 }
 
-impl From<Version> for TokenStream {
-    fn from(version: Version) -> TokenStream {
+impl From<&Version> for TokenStream {
+    fn from(version: &Version) -> TokenStream {
         let mut code = quote!();
-        for proc in version.procedures {
+        for proc in &version.procedures {
             let proc_code: TokenStream = proc.into();
             code = quote!( #code #proc_code );
         }

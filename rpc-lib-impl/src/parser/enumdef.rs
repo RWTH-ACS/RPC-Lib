@@ -16,18 +16,18 @@ pub struct Enum {
     pub cases: std::vec::Vec<(String, Value)>,
 }
 
-impl From<Enumdef> for TokenStream {
-    fn from(enum_def: Enumdef) -> TokenStream {
+impl From<&Enumdef> for TokenStream {
+    fn from(enum_def: &Enumdef) -> TokenStream {
         let name = quote::format_ident!("{}", enum_def.name);
-        let enum_body: TokenStream = enum_def.enum_body.into();
+        let enum_body: TokenStream = (&enum_def.enum_body).into();
         quote!(enum #name #enum_body)
     }
 }
 
-impl From<Enum> for TokenStream {
-    fn from(en: Enum) -> TokenStream {
+impl From<&Enum> for TokenStream {
+    fn from(en: &Enum) -> TokenStream {
         let mut code = quote!();
-        for (case_ident, case_value) in en.cases {
+        for (case_ident, case_value) in &en.cases {
             match case_value {
                 Value::Numeric { val } => {
                     code = quote!(#code #case_ident = #val as isize,);
