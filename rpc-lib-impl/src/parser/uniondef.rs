@@ -228,37 +228,19 @@ mod tests {
 
     #[test]
     fn parse_union_1() {
-        let mut parsed = RPCLParser::parse(
-            Rule::union_body,
-            "switch(int x) {case X: int x; case Y2: unsigned hyper c; default: void; }",
-        )
-        .unwrap();
-        let union_body = Union::from(parsed.next().unwrap());
-
-        let un = Union {
+        // Parser
+        let mut parsed = RPCLParser::parse(Rule::union_body, "switch(int x) {case X: int x; case Y2: unsigned hyper c; default: void; }").unwrap();
+        let union_generated = Union::from(parsed.next().unwrap());
+        let union_coded = Union {
             discriminant: DiscriminantType::Int,
             cases: vec![
                 (
                     Value::Named { name: "X".into() },
-                    Declaration {
-                        decl_type: DeclarationType::TypeNameDecl,
-                        data_type: DataType::Integer {
-                            length: 32,
-                            signed: true,
-                        },
-                        name: "x".into(),
-                    },
+                    Declaration::from(RPCLParser::parse(Rule::declaration, "int x").unwrap().next().unwrap()),
                 ),
                 (
                     Value::Named { name: "Y2".into() },
-                    Declaration {
-                        decl_type: DeclarationType::TypeNameDecl,
-                        data_type: DataType::Integer {
-                            length: 64,
-                            signed: false,
-                        },
-                        name: "c".into(),
-                    },
+                    Declaration::from(RPCLParser::parse(Rule::declaration, "unsigned hyper c").unwrap().next().unwrap()),
                 ),
             ],
             default: std::boxed::Box::new(Declaration {
@@ -267,44 +249,40 @@ mod tests {
                 name: "".into(),
             }),
         };
-        assert!(un == union_body, "Union Body wrong");
+        assert!(union_generated == union_coded, "Union parsing wrong");
     }
 
     #[test]
+    #[should_panic( expected = "Unsigned int as discriminant not implemented yet")]
     fn parse_union_2() {
-        let mut parsed = RPCLParser::parse(
-            Rule::union_def,
-            "union MyUnion switch(unsigned int err) {case 1: int y; default: void; };",
-        )
-        .unwrap();
-        let parsed_def = Uniondef::from(parsed.next().unwrap());
-
-        let un = Union {
-            discriminant: DiscriminantType::UnsignedInt,
-            cases: vec![(
-                Value::Numeric { val: 1 },
-                Declaration {
-                    decl_type: DeclarationType::TypeNameDecl,
-                    data_type: DataType::Integer {
-                        length: 32,
-                        signed: true,
-                    },
-                    name: "y".into(),
-                },
-            )],
-            default: std::boxed::Box::new(Declaration {
-                decl_type: DeclarationType::VoidDecl,
-                data_type: DataType::Void,
-                name: "".into(),
-            }),
+        // Parser
+        let mut parsed = RPCLParser::parse(Rule::union_def, "union MyUnion switch(unsigned int err) {case 1: int y; default: void; };").unwrap();
+        let union_generated = Uniondef::from(parsed.next().unwrap());
+        let union_coded = Uniondef { 
+            name: "MyUnion".to_string(),
+            union_body: Union {
+                discriminant: DiscriminantType::UnsignedInt,
+                cases: vec![
+                    (
+                        Value::Numeric { val: 1 },
+                        Declaration::from(RPCLParser::parse(Rule::declaration, "int y").unwrap().next().unwrap()),
+                    ),
+                ],
+                default: std::boxed::Box::new(Declaration {
+                    decl_type: DeclarationType::VoidDecl,
+                    data_type: DataType::Void,
+                    name: "".into(),
+                }),
+            },
         };
-        assert!(
-            Uniondef {
-                name: "MyUnion".into(),
-                union_body: un
-            } == parsed_def,
-            "Union Def wrong"
-        );
+        assert!(union_generated == union_coded, "Union parsing wrong");
+
+        // Code-gen
+        let rust_code: TokenStream = quote!{
+            { CaseX { x: i32 }, CaseY2 { c: u64 }, CaseDefault, }
+        };
+        let generated_code: TokenStream = (&union_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "Union: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
@@ -340,49 +318,63 @@ mod tests {
 
     #[test]
     fn parse_union_def() {
-        let mut parsed = RPCLParser::parse(
-            Rule::union_def,
-            "union MyUnion2 switch(int err) {
-                case 0:
-                    int result;
-                case 2:
-                    float result;
-                default:
-                    void;
-            };",
-        )
-        .unwrap();
-        let parsed_def = Uniondef::from(parsed.next().unwrap());
-
-        let un = Union {
-            discriminant: DiscriminantType::Int,
-            cases: vec![
-                (
-                    Value::Numeric { val: 0 },
-                    Declaration {
-                        decl_type: DeclarationType::TypeNameDecl,
-                        data_type: DataType::Integer {
-                            length: 32,
-                            signed: true,
-                        },
-                        name: "result".into(),
-                    },
-                ),
-                (
-                    Value::Numeric { val: 2 },
-                    Declaration {
-                        decl_type: DeclarationType::TypeNameDecl,
-                        data_type: DataType::Float { length: 32 },
-                        name: "result".into(),
-                    },
-                ),
-            ],
-            default: std::boxed::Box::new(Declaration {
-                decl_type: DeclarationType::VoidDecl,
-                data_type: DataType::Void,
-                name: "".into(),
-            }),
+        // Parser
+        let mut parsed = RPCLParser::parse(Rule::union_def, "union MyUnion2 switch(int err) {case 0: int result; case 2: float result; default: void; };").unwrap();
+        let union_generated = Uniondef::from(parsed.next().unwrap());
+        let union_coded = Uniondef { 
+            name: "MyUnion2".to_string(),
+            union_body: Union {
+                discriminant: DiscriminantType::Int,
+                cases: vec![
+                    (
+                        Value::Numeric { val: 0 },
+                        Declaration::from(RPCLParser::parse(Rule::declaration, "int result").unwrap().next().unwrap()),
+                    ),
+                    (
+                        Value::Numeric { val: 2 },
+                        Declaration::from(RPCLParser::parse(Rule::declaration, "float result").unwrap().next().unwrap()),
+                    ),
+                ],
+                default: std::boxed::Box::new(Declaration {
+                    decl_type: DeclarationType::VoidDecl,
+                    data_type: DataType::Void,
+                    name: "".into(),
+                }),
+            },
         };
-        assert!(un == parsed_def.union_body, "Union Def wrong");
+        assert!(union_generated == union_coded, "Union parsing wrong");
+
+        // Code-gen
+        let rust_code: TokenStream = quote!{
+            enum MyUnion2 { Case0 { result: i32 }, Case2 { result: f32 }, CaseDefault, }
+            impl Xdr for MyUnion2 {
+                fn deserialize(bytes: &Vec<u8> , parse_index: &mut usize) -> Self {
+                    let err_code = i32::deserialize(bytes, parse_index);
+                    match err_code {
+                        0i32 => Self::Case0 { result: i32::deserialize(bytes, parse_index) },
+                        2i32 => Self::Case2 { result: f32::deserialize(bytes, parse_index) },
+                        _ => Self::CaseDefault,
+                        _ => panic!("Unknown field of discriminated union with Field-Value {}", err_code),
+                    }
+                }
+                fn serialize(&self) -> std::vec::Vec<u8> {
+                    let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+                    match self {
+                        Self::Case0 { result } => {
+                            vec.extend(i32::serialize(&0i32));
+                            vec.extend(<i32>::serialize(&result));
+                        }
+                        Self::Case2 { result } => {
+                            vec.extend(i32::serialize(&2i32));
+                            vec.extend(<f32>::serialize(&result));
+                        }
+                        Self::CaseDefault => { }
+                    }
+                    vec
+                }
+            }
+        };
+        let generated_code: TokenStream = (&union_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "Union: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 }

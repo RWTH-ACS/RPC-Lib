@@ -50,14 +50,17 @@ mod tests {
 
     #[test]
     fn test_file_rule() {
-        let x_file = "program PROG {
+        let file_str = "program PROG {
             version VERS {
                 int FUNC(void) = 1;
             } = 1;
         } = 10;";
-        let _parsed = RPCLParser::parse(Rule::file, x_file).expect("Syntax Error in .x-File");
+        let _parsed = RPCLParser::parse(Rule::file, file_str).expect("Syntax Error in .x-File");
+    }
 
-        let x_file = "struct X {
+    #[test]
+    fn test_file_rule_2() {
+        let file_str = "struct X {
             int x;
             int y;
         };
@@ -67,6 +70,6 @@ mod tests {
                 int FUNC(void) = 1;
             } = 1;
         } = 10;";
-        let parsed = RPCLParser::parse(Rule::file, x_file).expect("Syntax Error in .x-File");
+        let _parsed = RPCLParser::parse(Rule::file, file_str).expect("Syntax Error in .x-File");
     }
 }

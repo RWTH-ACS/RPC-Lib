@@ -58,13 +58,13 @@ impl From<&DataType> for TokenStream {
                 quote!(#ident)
             }
             DataType::Struct { def: _ } => {
-                panic!();
+                panic!("Anonymous struct as Datatype not implemented");
             }
             DataType::Union { def: _ } => {
-                panic!();
+                panic!("Anonymous union as Datatype not implemented");
             }
             DataType::Enum { def: _ } => {
-                panic!();
+                panic!("Anonymous enum as Datatype not implemented");
             }
             DataType::Void => {
                 quote!()
@@ -153,62 +153,70 @@ mod tests {
 
     #[test]
     fn parse_type_spec_primitive_1() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::type_specifier, "unsigned int").unwrap();
-        let data = DataType::from(parsed.next().unwrap());
+        let data_generated = DataType::from(parsed.next().unwrap());
+        let data_coded = DataType::Integer { length: 32, signed: false, };
+        assert!(data_generated == data_coded, "Datatype parsed wrong");
 
-        assert!(
-            data == DataType::Integer {
-                length: 32,
-                signed: false
-            },
-            "Datatype parsed wrong"
-        );
+        // Code-gen
+        let rust_code: TokenStream = quote!( u32 );
+        let generated_code: TokenStream = (&data_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_type_spec_primitive_2() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::type_specifier, "float").unwrap();
-        let data = DataType::from(parsed.next().unwrap());
+        let data_generated = DataType::from(parsed.next().unwrap());
+        let data_coded = DataType::Float { length: 32, };
+        assert!(data_generated == data_coded, "Datatype parsed wrong");
 
-        assert!(
-            data == DataType::Float { length: 32 },
-            "Datatype parsed wrong"
-        );
+        // Code-gen
+        let rust_code: TokenStream = quote!( f32 );
+        let generated_code: TokenStream = (&data_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_type_spec_primitive_3() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::type_specifier, "bool").unwrap();
-        let data = DataType::from(parsed.next().unwrap());
+        let data_generated = DataType::from(parsed.next().unwrap());
+        assert!(data_generated == DataType::Boolean, "Datatype parsed wrong");
 
-        assert!(data == DataType::Boolean, "Datatype parsed wrong");
+        // Code-gen
+        let rust_code: TokenStream = quote!( bool );
+        let generated_code: TokenStream = (&data_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_type_spec_custom_type_1() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::type_specifier, "MyCustom23Type").unwrap();
-        let data = DataType::from(parsed.next().unwrap());
+        let data_generated = DataType::from(parsed.next().unwrap());
+        let data_coded = DataType::TypeDef { name: "MyCustom23Type".to_string() };
+        assert!(data_generated == data_coded, "Datatype parsed wrong");
 
-        assert!(
-            data == DataType::TypeDef {
-                name: "MyCustom23Type".to_string()
-            },
-            "Datatype parsed wrong"
-        );
+        // Code-gen
+        let rust_code: TokenStream = quote!( MyCustom23Type );
+        let generated_code: TokenStream = (&data_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
+    #[should_panic(expected = "Anonymous enum as Datatype not implemented")]
     fn parse_enum_type_spec_1() {
         let mut parsed = RPCLParser::parse(Rule::type_specifier, "enum { A = 1 }").unwrap();
-        let data = DataType::from(parsed.next().unwrap());
+        let data_generated = DataType::from(parsed.next().unwrap());
+        let data_coded = DataType::Enum { def: Enum { cases: vec![("A".into(), Value::Numeric { val: 1 })] } };
+        assert!(data_generated == data_coded, "Datatype parsed wrong");
 
-        assert!(
-            data == DataType::Enum {
-                def: Enum {
-                    cases: vec![("A".into(), Value::Numeric { val: 1 })]
-                }
-            },
-            "Datatype parsed wrong"
-        );
+        // Code-gen
+        let rust_code: TokenStream = quote!();
+        let generated_code: TokenStream = (&data_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 }

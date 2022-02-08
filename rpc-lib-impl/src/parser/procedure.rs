@@ -5,6 +5,7 @@ use quote::{format_ident, quote};
 use super::constant::Value;
 use super::datatype::DataType;
 
+#[derive(PartialEq)]
 pub struct Procedure {
     name: String,
     return_type: DataType,
@@ -78,34 +79,52 @@ mod tests {
 
     #[test]
     fn parse_procedure_1() {
-        let mut parsed = RPCLParser::parse(
-            Rule::procedure_def,
-            "float PROC_NAME(int, float) = 1;"
-        ).unwrap();
+        // Parsing
+        let mut parsed = RPCLParser::parse(Rule::procedure_def, "float PROC_NAME(int, float) = 1;").unwrap();
+        let proc_generated = Procedure::from(parsed.next().unwrap());
+        let proc_coded = Procedure {
+            name: "PROC_NAME".to_string(),
+            return_type: DataType::Float { length: 32 },
+            args: vec![
+                DataType::Integer { length: 32, signed: true },
+                DataType::Float { length: 32 },
+            ],
+            num: Value::Numeric { val: 1 },
+        };
+        assert!(proc_generated == proc_coded, "Procedure parsing wrong");
 
-        let proc = Procedure::from(parsed.next().unwrap());
-
-        assert!(proc.name == "PROC_NAME".to_string(), "Procedure name wrong");
-        assert!(proc.return_type == DataType::Float { length: 32 }, "Procedure return type wrong");
-        assert!(proc.args == vec![
-            DataType::Integer { length: 32, signed: true },
-            DataType::Float { length: 32 },
-        ], "Arguments wrong");
-        assert!(proc.num == Value::Numeric { val: 1 }, "Procedure Number wrong");
+        // Code-gen
+        let rust_code: TokenStream = quote!{
+            fn PROC_NAME(&mut self, x0: i32, x1: f32, ) -> f32 {
+                let mut send_data = std::vec::Vec::new();
+                send_data.extend(x0.serialize());
+                send_data.extend(x1.serialize());
+                let recv = rpc_lib::rpc_call(&mut self.client, 1i64 as u32, &send_data);
+                let mut parse_index = 0;
+                <f32>::deserialize(&recv, &mut parse_index)
+            }
+        };
+        let generated_code: TokenStream = (&proc_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "Procedure: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_procedure_2() {
-        let mut parsed = RPCLParser::parse(
-            Rule::procedure_def,
-            "void PROC_NAME(void) = 0x24;"
-        ).unwrap();
+        let mut parsed = RPCLParser::parse(Rule::procedure_def, "void PROC_NAME(void) = 0x24;").unwrap();
+        let proc_generated = Procedure::from(parsed.next().unwrap());
+        let proc_coded = Procedure {
+            name: "PROC_NAME".to_string(),
+            return_type: DataType::Void,
+            args: vec![],
+            num: Value::Numeric { val: 36 },
+        };
+        assert!(proc_generated == proc_coded, "Procedure parsing wrong");
 
-        let proc = Procedure::from(parsed.next().unwrap());
-
-        assert!(proc.name == "PROC_NAME".to_string(), "Procedure name wrong");
-        assert!(proc.return_type == DataType::Void, "Procedure return type wrong");
-        assert!(proc.args == vec![], "Arguments wrong");
-        assert!(proc.num == Value::Numeric { val: 0x24 }, "Procedure Number wrong");
+        // Code-gen
+        let rust_code: TokenStream = quote!{
+            fn PROC_NAME(&self, ) { }
+        };
+        let generated_code: TokenStream = (&proc_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "Procedure: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 }

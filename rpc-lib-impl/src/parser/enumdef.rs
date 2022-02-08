@@ -1,7 +1,7 @@
 use crate::parser::parser::Rule;
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, format_ident};
 
 use super::constant::Value;
 
@@ -28,12 +28,14 @@ impl From<&Enum> for TokenStream {
     fn from(en: &Enum) -> TokenStream {
         let mut code = quote!();
         for (case_ident, case_value) in &en.cases {
+            let case_name = format_ident!("{}", case_ident);
             match case_value {
                 Value::Numeric { val } => {
-                    code = quote!(#code #case_ident = #val as isize,);
+                    code = quote!(#code #case_name = #val as isize,);
                 }
                 Value::Named { name } => {
-                    code = quote!(#code #case_ident = #name,);
+                    let value_name = format_ident!("{}", name);
+                    code = quote!(#code #case_name = #value_name,);
                 }
             }
         }
@@ -48,11 +50,11 @@ pub fn parse_enum_type_spec(enum_type_spec: pest::iterators::Pair<'_, Rule>) -> 
 impl From<pest::iterators::Pair<'_, Rule>> for Enumdef {
     fn from(enum_def: pest::iterators::Pair<'_, Rule>) -> Enumdef {
         let mut iter = enum_def.into_inner();
-        let name = iter.next().unwrap();
+        let enum_name = iter.next().unwrap();
         let enum_body = iter.next().unwrap();
 
         Enumdef {
-            name: name.as_str().to_string(),
+            name: enum_name.as_str().to_string(),
             enum_body: Enum::from(enum_body),
         }
     }
@@ -81,32 +83,31 @@ mod tests {
 
     #[test]
     fn parse_enum_1() {
-        let mut parsed =
-            RPCLParser::parse(Rule::enum_body, "{CASE1 = 2, CASE_T = 0xa, _CASE = CONST}").unwrap();
-        let enum_body = Enum::from(parsed.next().unwrap());
-
-        let en = Enum {
+        // Parsing
+        let mut parsed = RPCLParser::parse(Rule::enum_body, "{CASE1 = 2, CASE_T = 0xa, _CASE = CONST}").unwrap();
+        let enum_generated = Enum::from(parsed.next().unwrap());
+        let enum_coded = Enum {
             cases: vec![
                 ("CASE1".into(), Value::Numeric { val: 2 }),
                 ("CASE_T".into(), Value::Numeric { val: 10 }),
-                (
-                    "_CASE".into(),
-                    Value::Named {
-                        name: "CONST".into(),
-                    },
-                ),
+                ("_CASE".into(), Value::Named { name: "CONST".into(), },),
             ],
         };
-        assert!(en == enum_body, "Enum Body wrong");
+        assert!(enum_generated == enum_coded, "Enum parsing wrong");
+
+        // Code-gen
+        let rust_code: TokenStream = quote!( { CASE1 = 2i64 as isize, CASE_T = 10i64 as isize, _CASE = CONST, } );
+        let generated_code: TokenStream = (&enum_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_enum_def_1() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::enum_def, "enum Name { A = 1, B = 2};").unwrap();
-        let parsed_def = Enumdef::from(parsed.next().unwrap());
-
-        let enum_def = Enumdef {
-            name: "Name".into(),
+        let enum_generated = Enumdef::from(parsed.next().unwrap());
+        let enum_coded = Enumdef {
+            name: "Name".to_string(),
             enum_body: Enum {
                 cases: vec![
                     ("A".into(), Value::Numeric { val: 1 }),
@@ -114,20 +115,25 @@ mod tests {
                 ],
             },
         };
-        assert!(enum_def == parsed_def, "Enum Def wrong");
+        assert!(enum_generated == enum_coded, "Enum parsing wrong");
+
+        // Code-gen
+        let rust_code: TokenStream = quote!( enum Name { A = 1i64 as isize, B = 2i64 as isize, } );
+        let generated_code: TokenStream = (&enum_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_enum_type_spec_1() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::enum_type_spec, "enum { A = 1, B = 2}").unwrap();
-        let enum_body = parse_enum_type_spec(parsed.next().unwrap());
-
-        let en = Enum {
+        let enum_generated = parse_enum_type_spec(parsed.next().unwrap());
+        let enum_coded = Enum {
             cases: vec![
                 ("A".into(), Value::Numeric { val: 1 }),
                 ("B".into(), Value::Numeric { val: 2 }),
             ],
         };
-        assert!(en == enum_body, "Enum Type Spec wrong");
+        assert!(enum_generated == enum_coded, "Enum parsing wrong");
     }
 }

@@ -1,7 +1,7 @@
 use crate::parser::parser::Rule;
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, format_ident};
 
 use super::declaration::Declaration;
 
@@ -16,49 +16,72 @@ pub struct Struct {
     pub fields: std::vec::Vec<Declaration>,
 }
 
+fn make_serialization_code(struct_body: &Struct) -> TokenStream {
+    let mut serialization_code = quote!();
+    for field in &struct_body.fields {
+        let field_name = format_ident!("{}", &field.name);
+        serialization_code = quote!{
+            #serialization_code vec.extend(self.#field_name.serialize());
+        };
+    }
+    quote!{
+        fn serialize(&self) -> std::vec::Vec<u8> {
+            let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+            #serialization_code
+            vec
+        }
+    }
+}
+
+fn make_deserialization_code(struct_body: &Struct) -> TokenStream {
+    let mut deserialization_code = quote!();
+    for field in &struct_body.fields {
+        let field_name = format_ident!("{}", &field.name);
+        let field_type: TokenStream = (&field.data_type).into();
+        deserialization_code = quote!( #deserialization_code #field_name: <#field_type> :: deserialize(bytes, parse_index), )
+    }
+    quote!{
+        fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
+            Self {
+                #deserialization_code
+            }
+        }
+    }
+}
+
 impl From<&Structdef> for TokenStream {
     fn from(struct_def: &Structdef) -> TokenStream {
         // Name
-        let name = quote::format_ident!("{}", struct_def.name);
+        let name = format_ident!("{}", struct_def.name);
         let struct_body = &struct_def.struct_body;
 
-        // Serialization
-        let mut serialization_code = quote!();
-        let mut deserialization_code = quote!();
-        let mut struct_body_code = quote!();
-
+        // Struct Body
+        let mut struct_code = quote!();
         for field in &struct_body.fields {
-            let field_name = quote::format_ident!("{}", &field.name);
+            let field_name = format_ident!("{}", &field.name);
             let field_type: TokenStream = (&field.data_type).into();
-            serialization_code = quote!{
-                #serialization_code vec.extend(self.#field_name.serialize());
-            };
-            struct_body_code = quote!( #struct_body_code #field_name: #field_type, );
-            deserialization_code = quote!( #deserialization_code #field_name: <#field_type> :: deserialize(bytes, parse_index), )
+            struct_code = quote!( #struct_code #field_name: #field_type, );
         }
+        struct_code = quote!{
+            struct #name {
+                #struct_code
+            }
+        };
 
-        let code = quote!{
+        // (De)serialization
+        let serialization_func_code = make_serialization_code(&struct_body);
+        let deserialization_func_code = make_deserialization_code(&struct_body);
+        let ser_code = quote!{
             impl Xdr for #name {
-                fn serialize(&self) -> std::vec::Vec<u8> {
-                    let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
-                    #serialization_code
-                    vec
-                }
-
-                fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
-                    #name {
-                        #deserialization_code
-                    }
-                }
+                #serialization_func_code
+                #deserialization_func_code
             }
         };
 
         // Struct
         quote!{
-            struct #name {
-                #struct_body_code
-            }
-            #code
+            #struct_code
+            #ser_code
         }
     }
 }
@@ -119,6 +142,7 @@ mod tests {
 
     #[test]
     fn parse_struct_1() {
+        // Parser
         let mut parsed = RPCLParser::parse(Rule::struct_body, "{ int x; double f; }").unwrap();
         let struct_body = Struct::from(parsed.next().unwrap());
 
@@ -140,10 +164,18 @@ mod tests {
             ],
         };
         assert!(st == struct_body, "Struct Body wrong");
+
+        // Code-gen
+        let rust_code: TokenStream = quote!{
+            { x: i32, f: f64, }
+        };
+        let generated_code: TokenStream = (&struct_body).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "Struct: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_struct_2() {
+        // Parser
         let mut parsed = RPCLParser::parse(
             Rule::struct_body,
             "{ unsigned hyper x1_; MyCustomType_2 f; }",
@@ -171,50 +203,86 @@ mod tests {
             ],
         };
         assert!(st == struct_body, "Struct Body wrong");
+
+        // Code-gen
+        let rust_code: TokenStream = quote!{
+            { x1_: u64, f: MyCustomType_2, }
+        };
+        let generated_code: TokenStream = (&struct_body).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "Struct: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_struct_def() {
+        // Parser
         let mut parsed = RPCLParser::parse(
             Rule::struct_def,
-            "struct MyStruct_ { int x; quadruple f; MyType t; };",
+            "struct MyStruct_ { int x; double f; MyType t; };",
         )
         .unwrap();
         let struct_def = Structdef::from(parsed.next().unwrap());
 
-        let st = Struct {
-            fields: vec![
-                Declaration {
-                    decl_type: DeclarationType::TypeNameDecl,
-                    data_type: DataType::Integer {
-                        length: 32,
-                        signed: true,
+        let st = Structdef {
+            name: "MyStruct_".to_string(),
+            struct_body: Struct {
+                fields: vec![
+                    Declaration {
+                        decl_type: DeclarationType::TypeNameDecl,
+                        data_type: DataType::Integer {
+                            length: 32,
+                            signed: true,
+                        },
+                        name: "x".into(),
                     },
-                    name: "x".into(),
-                },
-                Declaration {
-                    decl_type: DeclarationType::TypeNameDecl,
-                    data_type: DataType::Float { length: 128 },
-                    name: "f".into(),
-                },
-                Declaration {
-                    decl_type: DeclarationType::TypeNameDecl,
-                    data_type: DataType::TypeDef {
-                        name: "MyType".into(),
+                    Declaration {
+                        decl_type: DeclarationType::TypeNameDecl,
+                        data_type: DataType::Float { length: 64 },
+                        name: "f".into(),
                     },
-                    name: "t".into(),
-                },
-            ],
+                    Declaration {
+                        decl_type: DeclarationType::TypeNameDecl,
+                        data_type: DataType::TypeDef {
+                            name: "MyType".into(),
+                        },
+                        name: "t".into(),
+                    },
+                ],
+            },
         };
-        assert!(
-            struct_def.name == "MyStruct_".to_string(),
-            "Struct Def name wrong"
-        );
-        assert!(struct_def.struct_body == st, "Struct Def Struct Body wrong");
+        assert!(struct_def == st, "Struct Def wrong");
+
+        // Code-gen
+        let rust_code: TokenStream = quote!{
+            struct MyStruct_ {
+                x: i32,
+                f: f64,
+                t: MyType,
+            }
+            impl Xdr for MyStruct_ {
+                fn serialize(&self) -> std::vec::Vec<u8> {
+                    let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+                    vec.extend(self.x.serialize());
+                    vec.extend(self.f.serialize());
+                    vec.extend(self.t.serialize());
+                    vec
+                }
+
+                fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
+                    Self {
+                        x: <i32>::deserialize(bytes, parse_index),
+                        f: <f64>::deserialize(bytes, parse_index),
+                        t: <MyType>::deserialize(bytes, parse_index),
+                    }
+                }
+            }
+        }.into();
+        let generated_code: TokenStream = (&struct_def).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "Struct: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_struct_type_spec_1() {
+        // Parser
         let mut parsed = RPCLParser::parse(Rule::struct_type_spec, "struct { int x; }").unwrap();
         let struct_body = parse_struct_type_spec(parsed.next().unwrap());
 
@@ -229,5 +297,12 @@ mod tests {
             }],
         };
         assert!(struct_body == st, "Struct Type Spec wrong");
+
+        // Code-gen
+        let rust_code: TokenStream = quote!{
+            { x: i32, }
+        };
+        let generated_code: TokenStream = (&struct_body).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "Struct: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 }

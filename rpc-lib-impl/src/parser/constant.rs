@@ -1,8 +1,9 @@
 use crate::parser::parser::Rule;
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, format_ident};
 
+#[derive(PartialEq)]
 pub struct ConstantDeclaration {
     name: String,
     value: Value,
@@ -16,9 +17,9 @@ pub enum Value {
 
 impl From<&ConstantDeclaration> for TokenStream {
     fn from(constant: &ConstantDeclaration) -> TokenStream {
-        let name = &constant.name;
+        let name = format_ident!("{}", &constant.name);
         let value: TokenStream = (&constant.value).into();
-        quote!(const #name = #value)
+        quote!(const #name: i64 = #value;)
     }
 }
 
@@ -71,24 +72,13 @@ impl From<pest::iterators::Pair<'_, Rule>> for Value {
 
 impl From<pest::iterators::Pair<'_, Rule>> for ConstantDeclaration {
     fn from(constant_def: pest::iterators::Pair<'_, Rule>) -> ConstantDeclaration {
-        let mut constant = ConstantDeclaration {
-            name: "".to_string(),
-            value: Value::Numeric { val: 0 },
-        };
-        for rule in constant_def.into_inner() {
-            match rule.as_rule() {
-                Rule::identifier => {
-                    constant.name = rule.as_str().to_string();
-                }
-                Rule::constant => {
-                    constant.value = Value::Numeric {
-                        val: parse_num(rule),
-                    }
-                }
-                _ => println!("Syntax Error"),
-            }
+        let mut it = constant_def.into_inner();
+        let name = it.next().unwrap();
+        let value = it.next().unwrap();
+        ConstantDeclaration {
+            name: name.as_str().to_string(),
+            value: Value::Numeric { val: parse_num(value) },
         }
-        constant
     }
 }
 
@@ -100,49 +90,69 @@ mod tests {
 
     #[test]
     fn parse_constant_decimal() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::constant_def, "const CON = 23;").unwrap();
-        let constant = ConstantDeclaration::from(parsed.next().unwrap());
+        let const_generated = ConstantDeclaration::from(parsed.next().unwrap());
+        let const_coded = ConstantDeclaration {
+            name: "CON".to_string(),
+            value: Value::Numeric { val: 23 },
+        };
+        assert!(const_generated == const_coded, "Constant parsing wrong");
 
-        assert!(
-            constant.value == Value::Numeric { val: 23 },
-            "Value of constant wrong"
-        );
-        assert!(constant.name == "CON", "Name of constant wrong");
+        // Code-gen
+        let rust_code: TokenStream = quote!( const CON: i64 = 23i64; );
+        let generated_code: TokenStream = (&const_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_constant_hexadecimal() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::constant_def, "const CON2 = 0x2889;").unwrap();
-        let constant = ConstantDeclaration::from(parsed.next().unwrap());
+        let const_generated = ConstantDeclaration::from(parsed.next().unwrap());
+        let const_coded = ConstantDeclaration {
+            name: "CON2".to_string(),
+            value: Value::Numeric { val: 0x2889 },
+        };
+        assert!(const_generated == const_coded, "Constant parsing wrong");
 
-        assert!(
-            constant.value == Value::Numeric { val: 0x2889 },
-            "Value of constant wrong"
-        );
-        assert!(constant.name == "CON2", "Name of constant wrong");
+        // Code-gen
+        let rust_code: TokenStream = quote!( const CON2: i64 = 10377i64; );
+        let generated_code: TokenStream = (&const_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_constant_negative_decimal() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::constant_def, "const CON = -68;").unwrap();
-        let constant = ConstantDeclaration::from(parsed.next().unwrap());
+        let const_generated = ConstantDeclaration::from(parsed.next().unwrap());
+        let const_coded = ConstantDeclaration {
+            name: "CON".to_string(),
+            value: Value::Numeric { val: -68 },
+        };
+        assert!(const_generated == const_coded, "Constant parsing wrong");
 
-        assert!(
-            constant.value == Value::Numeric { val: -68 },
-            "Value of constant wrong"
-        );
-        assert!(constant.name == "CON", "Name of constant wrong");
+        // Code-gen
+        let rust_code: TokenStream = quote!( const CON: i64 = -68i64; );
+        let generated_code: TokenStream = (&const_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 
     #[test]
     fn parse_constant_octal() {
+        // Parsing
         let mut parsed = RPCLParser::parse(Rule::constant_def, "const CON = 047;").unwrap();
-        let constant = ConstantDeclaration::from(parsed.next().unwrap());
+        let const_generated = ConstantDeclaration::from(parsed.next().unwrap());
+        let const_coded = ConstantDeclaration {
+            name: "CON".to_string(),
+            value: Value::Numeric { val: 39 },
+        };
+        assert!(const_generated == const_coded, "Constant parsing wrong");
 
-        assert!(
-            constant.value == Value::Numeric { val: 39 },
-            "Value of constant wrong"
-        );
-        assert!(constant.name == "CON", "Name of constant wrong");
+        // Code-gen
+        let rust_code: TokenStream = quote!( const CON: i64 = 39i64; );
+        let generated_code: TokenStream = (&const_generated).into();
+        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
     }
 }

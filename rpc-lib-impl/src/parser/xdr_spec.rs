@@ -40,7 +40,7 @@ impl From<&Specification> for TokenStream {
             let def: TokenStream = constant.into();
             code = quote!( #code #def );
         }
-        quote!(type opaque = std::vec::Vec<u8>; #code)
+        quote!(type opaque = u8; #code)
     }
 }
 
