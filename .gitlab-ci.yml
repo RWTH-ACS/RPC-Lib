@@ -1,34 +1,41 @@
-# This file is a template, and might need editing before it works on your project.
-# To contribute improvements to CI/CD templates, please follow the Development guide at:
-# https://docs.gitlab.com/ee/development/cicd/templates.html
-# This specific template is located at:
-# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Rust.gitlab-ci.yml
+variables:
+  GIT_STRATEGY: fetch
+  GIT_SUBMODULE_STRATEGY: recursive
+  DOCKER_FILE: tests/Dockerfile
+  DOCKER_TAG: ${CI_COMMIT_REF_NAME}
+  DOCKER_IMAGE_DEV: rpclib
 
-# Official language image. Look for the different tagged releases at:
-# https://hub.docker.com/r/library/rust/tags/
-image: "rust:latest"
+stages:
+    - prepare
+    - test
 
-# Optional: Pick zero or more services to be used on all builds.
-# Only needed when using a docker container to run your tests in.
-# Check out: http://docs.gitlab.com/ee/ci/docker/using_docker_images.html#what-is-a-service
-# services:
-#   - mysql:latest
-#   - redis:latest
-#   - postgres:latest
-
+# Build docker image
+prepare:centos8:docker-dev:
+  stage: prepare
+  script:
+    - docker build
+        --file ${DOCKER_FILE}
+        --tag ${DOCKER_IMAGE_DEV}:${DOCKER_TAG}
+        --tag ${DOCKER_IMAGE_DEV}:latest .
+  tags:
+    - docker
 
 # Parser Unit-Tests
 test:unit:
+  needs: ["prepare:centos8:docker-dev"]
+  image: ${DOCKER_IMAGE_DEV}:${DOCKER_TAG}
   script:
     - cd rpc-lib-impl && cargo test --workspace
+  tags:
+    - docker
 
 # Rpc-Lib Integration Tests
-test:integration:
-  # Install tirpc
-  before_script:
-    - apt-get update && apt-get install rpcbind libtirpc-dev
-  script:
-    - cd tests/server/ && mv ../math.x math.x && make math_server && ./math_server & 
-    - rpcinfo -p
-    - cargo test
-    - pwd
+# test:integration:
+#   stage: test
+#   needs: ["prepare:centos8:docker-dev"]
+#   image: ${DOCKER_IMAGE_DEV}:${DOCKER_TAG}
+#   script:
+#     - cd tests/server/ && cp ../math.x math.x && /usr/bin/make math_server && ./math_server & 
+#     - cargo test
+#   tags:
+#     - docker

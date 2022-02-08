@@ -95,13 +95,13 @@ mod tests {
 
         // Code-gen
         let rust_code: TokenStream = quote!{
-            fn PROC_NAME(&mut self, x0: i32, x1: f32, ) -> f32 {
+            fn PROC_NAME(&mut self, x0: &i32, x1: &f32, ) -> std::io::Result<f32> {
                 let mut send_data = std::vec::Vec::new();
                 send_data.extend(x0.serialize());
                 send_data.extend(x1.serialize());
-                let recv = rpc_lib::rpc_call(&mut self.client, 1i64 as u32, &send_data);
+                let recv = rpc_lib::rpc_call(&mut self.client, 1i64 as u32, &send_data)?;
                 let mut parse_index = 0;
-                <f32>::deserialize(&recv, &mut parse_index)
+                Ok(<f32>::deserialize(&recv, &mut parse_index))
             }
         };
         let generated_code: TokenStream = (&proc_generated).into();
