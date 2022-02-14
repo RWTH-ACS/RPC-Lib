@@ -22,7 +22,7 @@ impl From<&Procedure> for TokenStream {
         for arg in &proc.args {
             let arg_name = format_ident!("x{}", i);
             let arg_type: TokenStream = arg.into();
-            args = quote!( #args #arg_name: #arg_type,);
+            args = quote!( #args #arg_name: &#arg_type,);
             serialization_code = quote!( #serialization_code send_data.extend(#arg_name.serialize()); );
             i = i + 1;
         }
