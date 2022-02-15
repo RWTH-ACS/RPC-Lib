@@ -4,6 +4,7 @@ use std::vec::Vec;
 
 use super::xdr::*;
 use std::convert::TryFrom;
+use std::io::*;
 
 struct Rpcb {
     program: u32,
@@ -232,10 +233,14 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> RpcClient {
     }
 }
 
-// Rpc-Call
 pub fn rpc_call(client: &mut RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u8> {
+    send_rpc_request(client, procedure, send).expect("rpc_call: Failed to send Request");
+    receive_rpc_reply(client).expect("rpc_call: Failed to receive reply")
+}
+
+fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &Vec<u8>) -> Result<()> {
     const REQUEST_HEADER_LEN: usize = 40;
-    let length = REQUEST_HEADER_LEN + send.len();
+    let length = REQUEST_HEADER_LEN + send_data.len();
 
     // println!("[Rpc-Lib] Request Procedure: {}", procedure);
     let request = RpcRequest {
@@ -255,27 +260,57 @@ pub fn rpc_call(client: &mut RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u
         verifier: 0,
     };
 
-    // Connect
-
     // Send Request
     let request_header = request.serialize();
-    client.stream.write(&request_header).expect("rpc_call: Failed to send data");
-    client.stream.write(&*send).expect("rpc_call: Failed to send data");
+    client.stream.write(&request_header)?;
+    client.stream.write(&*send_data)?;
+    Ok(())
+}
 
+fn receive_rpc_reply(client: &mut RpcClient) -> Result<Vec<u8>> {
+    // Packet-length: If reply is split into multiple fragments,
+    // there will only be the fragment-header
+    //
+    // FRAGMENT-HEADER | REPLY-HEADER | PAYLOAD
+    //        4        |      24      |
+    const FRAGMENT_HEADER_LEN: usize = 4;
+    const REPLY_HEADER_LEN: usize = 24;
+    let mut vec: Vec<u8> = Vec::new();
+    // Receive first fragment
+    let mut last_fragment = receive_reply_packet(client, &mut vec, FRAGMENT_HEADER_LEN + REPLY_HEADER_LEN)?;
+    while !last_fragment {
+        // Receive following fragments
+        last_fragment = receive_reply_packet(client, &mut vec, FRAGMENT_HEADER_LEN)?;
+    }
+    Ok(vec)
+}
+
+fn receive_reply_packet(client: &mut RpcClient, buffer: &mut Vec<u8>, header_len: usize) -> Result<bool> {
     // Receive Header
-    let mut header_buf: [u8; 28] = [0; 28];
-    let rec = client.stream.read(&mut header_buf).expect("rpc_call: Failed to receive data");
-    assert!(rec == 28, "rpc_call: Failed to receive data");
-    let mut index = 0usize;
-    let reply_header = RpcReply::deserialize(&header_buf.to_vec(), &mut index);
-    let reply_length = reply_header.header.fragment_header.length as usize;
-    // println!("  Reply Length (Header-Field): {} Actual Header length: {} Actually read {} bytes", reply_length, index, rec);
+    let mut header_buf = Vec::with_capacity(header_len);
+    header_buf.resize(header_len, 0);
+    let rec = client.stream.read(&mut header_buf)?;
+    if rec != header_len {
+        return Err(Error::new(ErrorKind::Other, "rpc_call: Size of received Header wrong"));
+    }
+    let mut index: usize = 0;
+    let (payload_length, last_fragment) = if header_len == 28 {
+        let reply_header = RpcReply::deserialize(&header_buf.to_vec(), &mut index);
+        (reply_header.header.fragment_header.length as usize - header_len + 4,
+        reply_header.header.fragment_header.last_fragment)
+    } else {
+        let fragment_header = FragmentHeader::deserialize(&header_buf, &mut index);
+        (fragment_header.length as usize - header_len + 4,
+        fragment_header.last_fragment)
+    };
 
     // Receive Reply-Data
-    let mut vec = Vec::with_capacity(reply_length - 24);
-    unsafe{ vec.set_len(reply_length - 24); }
-    let rec = client.stream.read(vec.as_mut_slice()).expect("rpc_call: Failed to receive data");
-    assert!(rec == reply_length - 24, "rpc_call: Failed to receive data");
-    // println!("  Read {} bytes Reply-Data", rec);
-    vec
+    let old_len = buffer.len();
+    let new_len = old_len + payload_length;
+    buffer.resize(new_len, 0);
+    let rec = client.stream.read(&mut buffer[old_len..new_len])?;
+    if rec != payload_length {
+        return Err(Error::new(ErrorKind::Other, "rpc_call: Size of received Payload-Data wrong"));
+    }
+    Ok(last_fragment)
 }
