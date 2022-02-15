@@ -199,12 +199,12 @@ impl UniversalAddress {
 }
 
 // Create Client
-pub fn clnt_create(address: &str, program: u32, version: u32) -> RpcClient {
+pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClient> {
     let univ_addr_portmap = UniversalAddress::from_string(&(String::from(address) + ".0.111")); // Port of Portmap Service in universal address format
     let mut client = RpcClient {
         program: 100000,
         version: 4,
-        stream: TcpStream::connect(univ_addr_portmap.to_string()).expect("rpc_call: Failed to connect"),
+        stream: TcpStream::connect(univ_addr_portmap.to_string())?,
     };
 
     let rpcb = Rpcb {
@@ -216,26 +216,29 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> RpcClient {
     };
 
     // Proc 3: GETADDR
-    let vec = rpc_call(&mut client, 3, &rpcb.serialize());
+    let vec = rpc_call(&mut client, 3, &rpcb.serialize())?;
 
     // Parse Universal Address & Convert to Standard IP-Format
     let mut parse_index = 0;
     let universal_address_s = String::deserialize(&vec, &mut parse_index);
+    if universal_address_s.len() == 0 {
+        return Err(Error::new(ErrorKind::Other, "clnt_create: Rpc-Server not available"));
+    }
     let ip = UniversalAddress::from_string(&universal_address_s);
 
     // Create TcpStream
-    let stream = TcpStream::connect(ip.to_string()).expect("rpc_call: Failed to connect");
+    let stream = TcpStream::connect(ip.to_string())?;
 
-    RpcClient {
+    Ok(RpcClient {
         program: program,
         version: version,
         stream: stream,
-    }
+    })
 }
 
-pub fn rpc_call(client: &mut RpcClient, procedure: u32, send: &Vec<u8>) -> Vec<u8> {
-    send_rpc_request(client, procedure, send).expect("rpc_call: Failed to send Request");
-    receive_rpc_reply(client).expect("rpc_call: Failed to receive reply")
+pub fn rpc_call(client: &mut RpcClient, procedure: u32, send: &Vec<u8>) -> Result<Vec<u8>> {
+    send_rpc_request(client, procedure, send)?;
+    receive_rpc_reply(client)
 }
 
 fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &Vec<u8>) -> Result<()> {
@@ -268,7 +271,7 @@ fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &Vec<u8>)
 }
 
 fn receive_rpc_reply(client: &mut RpcClient) -> Result<Vec<u8>> {
-    // Packet-length: If reply is split into multiple fragments,
+    // Packet-length: If the reply is split into multiple fragments,
     // there will only be the fragment-header
     //
     // FRAGMENT-HEADER | REPLY-HEADER | PAYLOAD

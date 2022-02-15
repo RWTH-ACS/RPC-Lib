@@ -32,16 +32,16 @@ impl From<&Procedure> for TokenStream {
         }
         else {
             let return_type: TokenStream = (&proc.return_type).into();
-            quote!{ fn #proc_name (&mut self, #args) -> #return_type {
+            quote!{ fn #proc_name (&mut self, #args) -> std::io::Result<#return_type> {
                 // Parameter-Seralization
                 #serialization_code
 
                 // Call
-                let recv = rpc_lib::rpc_call(&mut self.client, #proc_num as u32, &send_data);
+                let recv = rpc_lib::rpc_call(&mut self.client, #proc_num as u32, &send_data)?;
 
                 // Parse ReplyHeader
                 let mut parse_index = 0;
-                <#return_type>::deserialize(&recv, &mut parse_index)
+                Ok(<#return_type>::deserialize(&recv, &mut parse_index))
             }}
         }
     }

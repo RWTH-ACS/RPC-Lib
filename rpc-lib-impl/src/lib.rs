@@ -51,10 +51,10 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         impl #name {
-            fn new(address: &str) -> #name {
-                #name {
-                    client: rpc_lib::clnt_create(address, #prog_num, #ver_num)
-                }
+            fn new(address: &str) -> std::io::Result<#name> {
+                Ok(#name {
+                    client: rpc_lib::clnt_create(address, #prog_num, #ver_num)?
+                })
             }
         }
     };
