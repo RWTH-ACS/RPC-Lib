@@ -127,7 +127,7 @@ impl Xdr for RpcRequest {
 }
 
 #[derive(Debug)]
-pub struct RpcReply {
+struct RpcReply {
     header: RpcCall,
     reply_state: u32,
     verifier: u64,
@@ -161,6 +161,12 @@ struct UniversalAddress {
     port: u16,
 }
 
+/// Contains required fields to make RPC-Calls.
+///
+/// Consists of:
+///  - An already connected [`TcpStream`] 
+///  - Program-Number (as defined in RPCL-File)
+///  - Version-Number (as defined in RPCL-File)
 #[derive(Debug)]
 pub struct RpcClient {
     program: u32,

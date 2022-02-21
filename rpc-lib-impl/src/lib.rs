@@ -44,13 +44,38 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
     let (generated_code, prog_num, ver_num) = parser::parse(&s, &struct_name);
 
     let name = format_ident!("{}", struct_name);
+    let doc_macro_call = std::format!("#[include_rpcl({})]", &name_x_file);
     let common_code = quote! {
 
+        /// Contains connection to Rpc-Service and associated functions as defined in
+        #[doc = #name_x_file]
+        /// .
+        ///
+        /// # Examples
+        /// 
+        /// Creates a connection to 127.0.0.1, makes an Rpc-Call and prints the result.
+        /// ```
+        /// extern crate rpc_lib;
+        /// use rpc_lib::include_rpcl;
+        /// 
+        #[doc = #doc_macro_call]
+        /// struct RPCStruct;
+        /// 
+        /// fn main() {
+        ///     let mut rpc = RPCStruct::new("127.0.0.1").expect("Server not available");
+        ///     let result = rpc.MY_RPC_PROCEDURE(&1, &2).expect("Rpc call failed");
+        ///     println!("MY_RPC_PROCEDURE returned: {}", result);
+        /// }
+        /// ```
         struct #name {
             client: rpc_lib::RpcClient
         }
 
         impl #name {
+            /// Creates Connection to requested Rpc-Service.
+            ///
+            /// Connects to Portmapper-Service, gets Port-Number of requested Rpc-Service and
+            /// connects to it.
             fn new(address: &str) -> std::io::Result<#name> {
                 Ok(#name {
                     client: rpc_lib::clnt_create(address, #prog_num, #ver_num)?

@@ -7,6 +7,9 @@
 use std::convert::{TryFrom, TryInto};
 use std::vec::Vec;
 
+/// Types with the `Xdr`-Trait can be serialised and deserialised as described in [`RFC 4506`]
+///
+/// [`RFC 4506`]: <https://datatracker.ietf.org/doc/html/rfc4506>
 pub trait Xdr {
     // Serializes data and converts to network byte order
     fn serialize(&self) -> std::vec::Vec<u8>;
@@ -14,7 +17,7 @@ pub trait Xdr {
     fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self;
 }
 
-// Constant Length Array
+/// Implementation for fixed-size arrays
 impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
     fn serialize(&self) -> std::vec::Vec<u8> {
         let mut vec = (self.len() as u32).serialize();
@@ -34,7 +37,7 @@ impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
     }
 }
 
-// Varlen Array
+/// Implementation for Variable-Length arrays
 impl<T: std::clone::Clone> Xdr for Vec<T> {
     fn serialize(&self) -> std::vec::Vec<u8> {
         // Length of data in bytes
@@ -73,18 +76,6 @@ impl<T: std::clone::Clone> Xdr for Vec<T> {
     }
 }
 
-impl Xdr for i8 {
-    fn serialize(&self) -> std::vec::Vec<u8> {
-        self.to_be_bytes().to_vec()
-    }
-
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> i8 {
-        let x = <&[u8; 1]>::try_from(&bytes[*parse_index..*parse_index + 1]).unwrap();
-        *parse_index += 1;
-        i8::from_be_bytes(*x)
-    }
-}
-
 impl Xdr for i32 {
     fn serialize(&self) -> std::vec::Vec<u8> {
         self.to_be_bytes().to_vec()
@@ -106,6 +97,18 @@ impl Xdr for u32 {
         let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
         *parse_index += 4;
         u32::from_be_bytes(*x)
+    }
+}
+
+impl Xdr for i64 {
+    fn serialize(&self) -> std::vec::Vec<u8> {
+        self.to_be_bytes().to_vec()
+    }
+
+    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> i64 {
+        let x = <&[u8; 8]>::try_from(&bytes[*parse_index..*parse_index + 8]).unwrap();
+        *parse_index += 8;
+        i64::from_be_bytes(*x)
     }
 }
 
