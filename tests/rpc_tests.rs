@@ -1,7 +1,7 @@
 extern crate rpc_lib;
 use rpc_lib::include_rpcl;
 
-#[include_rpcl("tests/math.x")]
+#[include_rpcl("tests/test.x")]
 struct RPCConnection;
 
 

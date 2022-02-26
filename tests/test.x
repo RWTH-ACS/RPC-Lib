@@ -1,4 +1,4 @@
-program MATH {
+program TEST {
     version VERS {
         int ADD(int, int) = 1;
     } = 1;
