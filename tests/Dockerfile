@@ -20,7 +20,7 @@ RUN dnf install -y epel-release dnf-plugins-core && \
 
 RUN dnf install -y make bash git gcc autoconf libtool automake rpcgen cargo \
                    ncurses-devel zlib-devel binutils-devel mesa-libGL-devel \
-                   libvdpau-devel mesa-libEGL-devel openssl-devel rpcbind \
+                   libvdpau-devel mesa-libEGL-devel openssl-devel rpcbind libtirpc-devel\
                    texinfo bison flex python3 which libibverbs libibverbs-devel \
                    libasan cppcheck wget expat-devel xz-devel mesa-libGLU-devel freeglut-devel
 
@@ -34,9 +34,3 @@ RUN dnf -y config-manager --add-repo http://developer.download.nvidia.com/comput
 ENV PATH="/usr/local/cuda/bin:${PATH}"
 ENV LIBRARY_PATH="/usr/local/cuda/targets/x86_64-linux/lib/stubs:$(LIBRARY_PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib/stubs:${LD_LIBRARY_PATH}"
-
-#COPY --chown=root .ssh /root/.ssh
-
-WORKDIR /cricket
-
-ENTRYPOINT /bin/bash

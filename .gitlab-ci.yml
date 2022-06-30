@@ -30,12 +30,18 @@ test:unit:
     - docker
 
 # Rpc-Lib Integration Tests
-# test:integration:
-#   stage: test
-#   needs: ["prepare:centos8:docker-dev"]
-#   image: ${DOCKER_IMAGE_DEV}:${DOCKER_TAG}
-#   script:
-#     - cd tests/server/ && cp ../math.x math.x && /usr/bin/make math_server && ./math_server & 
-#     - cargo test
-#   tags:
-#     - docker
+test:integration:
+  stage: test
+  needs: ["prepare:centos8:docker-dev"]
+  image: ${DOCKER_IMAGE_DEV}:${DOCKER_TAG}
+  script:
+    - rpcbind
+    - cd tests/server/ && mkdir gen && cd gen && cp ../../test.x .
+    - rpcgen -N test.x -a && rm -f Makefile.test && rm -f test_server.c && mv ../Makefile . && mv ../test_server.c .
+    - make test_server && mv test_server .. && cd ..
+    - ./test_server & 
+    - sleep 1 && rpcinfo
+    - cd ../..
+    - cargo test --tests
+  tags:
+    - docker

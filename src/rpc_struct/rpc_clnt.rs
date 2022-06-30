@@ -1,3 +1,11 @@
+// Copyright 2022 Philipp Fensch
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// https://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::vec::Vec;
@@ -271,8 +279,8 @@ fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &Vec<u8>)
 
     // Send Request
     let request_header = request.serialize();
-    client.stream.write(&request_header)?;
-    client.stream.write(&*send_data)?;
+    client.stream.write_all(&request_header)?;
+    client.stream.write_all(&*send_data)?;
     Ok(())
 }
 
@@ -298,10 +306,7 @@ fn receive_reply_packet(client: &mut RpcClient, buffer: &mut Vec<u8>, header_len
     // Receive Header
     let mut header_buf = Vec::with_capacity(header_len);
     header_buf.resize(header_len, 0);
-    let rec = client.stream.read(&mut header_buf)?;
-    if rec != header_len {
-        return Err(Error::new(ErrorKind::Other, "rpc_call: Size of received Header wrong"));
-    }
+    client.stream.read_exact(&mut header_buf)?;
     let mut index: usize = 0;
     let (payload_length, last_fragment) = if header_len == 28 {
         let reply_header = RpcReply::deserialize(&header_buf.to_vec(), &mut index);
@@ -317,9 +322,6 @@ fn receive_reply_packet(client: &mut RpcClient, buffer: &mut Vec<u8>, header_len
     let old_len = buffer.len();
     let new_len = old_len + payload_length;
     buffer.resize(new_len, 0);
-    let rec = client.stream.read(&mut buffer[old_len..new_len])?;
-    if rec != payload_length {
-        return Err(Error::new(ErrorKind::Other, "rpc_call: Size of received Payload-Data wrong"));
-    }
+    client.stream.read_exact(&mut buffer[old_len..new_len])?;
     Ok(last_fragment)
 }
