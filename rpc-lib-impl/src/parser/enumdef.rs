@@ -9,7 +9,7 @@
 use crate::parser::parser::Rule;
 
 use proc_macro2::TokenStream;
-use quote::{quote, format_ident};
+use quote::{format_ident, quote};
 
 use super::constant::Value;
 
@@ -92,21 +92,33 @@ mod tests {
     #[test]
     fn parse_enum_1() {
         // Parsing
-        let mut parsed = RPCLParser::parse(Rule::enum_body, "{CASE1 = 2, CASE_T = 0xa, _CASE = CONST}").unwrap();
+        let mut parsed =
+            RPCLParser::parse(Rule::enum_body, "{CASE1 = 2, CASE_T = 0xa, _CASE = CONST}").unwrap();
         let enum_generated = Enum::from(parsed.next().unwrap());
         let enum_coded = Enum {
             cases: vec![
                 ("CASE1".into(), Value::Numeric { val: 2 }),
                 ("CASE_T".into(), Value::Numeric { val: 10 }),
-                ("_CASE".into(), Value::Named { name: "CONST".into(), },),
+                (
+                    "_CASE".into(),
+                    Value::Named {
+                        name: "CONST".into(),
+                    },
+                ),
             ],
         };
         assert!(enum_generated == enum_coded, "Enum parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!( { CASE1 = 2i64 as isize, CASE_T = 10i64 as isize, _CASE = CONST, } );
+        let rust_code: TokenStream =
+            quote!( { CASE1 = 2i64 as isize, CASE_T = 10i64 as isize, _CASE = CONST, } );
         let generated_code: TokenStream = (&enum_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "DataType: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -126,9 +138,19 @@ mod tests {
         assert!(enum_generated == enum_coded, "Enum parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!( enum Name { A = 1i64 as isize, B = 2i64 as isize, } );
+        let rust_code: TokenStream = quote!(
+            enum Name {
+                A = 1i64 as isize,
+                B = 2i64 as isize,
+            }
+        );
         let generated_code: TokenStream = (&enum_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "DataType: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]

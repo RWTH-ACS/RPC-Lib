@@ -9,7 +9,7 @@
 use crate::parser::parser::Rule;
 
 use proc_macro2::TokenStream;
-use quote::{quote, format_ident};
+use quote::{format_ident, quote};
 
 #[derive(PartialEq)]
 pub struct ConstantDeclaration {
@@ -40,7 +40,8 @@ impl From<&Value> for TokenStream {
             Value::Named { name } => {
                 quote!(#name)
             }
-        }.into()
+        }
+        .into()
     }
 }
 
@@ -85,7 +86,9 @@ impl From<pest::iterators::Pair<'_, Rule>> for ConstantDeclaration {
         let value = it.next().unwrap();
         ConstantDeclaration {
             name: name.as_str().to_string(),
-            value: Value::Numeric { val: parse_num(value) },
+            value: Value::Numeric {
+                val: parse_num(value),
+            },
         }
     }
 }
@@ -108,9 +111,16 @@ mod tests {
         assert!(const_generated == const_coded, "Constant parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!( const CON: i64 = 23i64; );
+        let rust_code: TokenStream = quote!(
+            const CON: i64 = 23i64;
+        );
         let generated_code: TokenStream = (&const_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "DataType: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -125,9 +135,16 @@ mod tests {
         assert!(const_generated == const_coded, "Constant parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!( const CON2: i64 = 10377i64; );
+        let rust_code: TokenStream = quote!(
+            const CON2: i64 = 10377i64;
+        );
         let generated_code: TokenStream = (&const_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "DataType: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -142,9 +159,16 @@ mod tests {
         assert!(const_generated == const_coded, "Constant parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!( const CON: i64 = -68i64; );
+        let rust_code: TokenStream = quote!(
+            const CON: i64 = -68i64;
+        );
         let generated_code: TokenStream = (&const_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "DataType: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -159,8 +183,15 @@ mod tests {
         assert!(const_generated == const_coded, "Constant parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!( const CON: i64 = 39i64; );
+        let rust_code: TokenStream = quote!(
+            const CON: i64 = 39i64;
+        );
         let generated_code: TokenStream = (&const_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "DataType: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "DataType: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 }

@@ -60,15 +60,15 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
         /// .
         ///
         /// # Examples
-        /// 
+        ///
         /// Creates a connection to 127.0.0.1, makes an Rpc-Call and prints the result.
         /// ```
         /// extern crate rpc_lib;
         /// use rpc_lib::include_rpcl;
-        /// 
+        ///
         #[doc = #doc_macro_call]
         /// struct RPCStruct;
-        /// 
+        ///
         /// fn main() {
         ///     let mut rpc = RPCStruct::new("127.0.0.1").expect("Server not available");
         ///     let result = rpc.MY_RPC_PROCEDURE(&1, &2).expect("Rpc call failed");

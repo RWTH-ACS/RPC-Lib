@@ -9,7 +9,7 @@
 use crate::parser::parser::Rule;
 
 use proc_macro2::TokenStream;
-use quote::{quote, format_ident};
+use quote::{format_ident, quote};
 
 use super::declaration::Declaration;
 
@@ -28,11 +28,11 @@ fn make_serialization_code(struct_body: &Struct) -> TokenStream {
     let mut serialization_code = quote!();
     for field in &struct_body.fields {
         let field_name = format_ident!("{}", &field.name);
-        serialization_code = quote!{
+        serialization_code = quote! {
             #serialization_code self.#field_name.serialize(&mut writer)?;
         };
     }
-    quote!{
+    quote! {
         fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
             #serialization_code
             Ok(())
@@ -47,7 +47,7 @@ fn make_deserialization_code(struct_body: &Struct) -> TokenStream {
         let field_type: TokenStream = (&field.data_type).into();
         deserialization_code = quote!( #deserialization_code #field_name: <#field_type> :: deserialize(bytes, parse_index), )
     }
-    quote!{
+    quote! {
         fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
             Self {
                 #deserialization_code
@@ -69,7 +69,7 @@ impl From<&Structdef> for TokenStream {
             let field_type: TokenStream = (&field.data_type).into();
             struct_code = quote!( #struct_code #field_name: #field_type, );
         }
-        struct_code = quote!{
+        struct_code = quote! {
             struct #name {
                 #struct_code
             }
@@ -78,7 +78,7 @@ impl From<&Structdef> for TokenStream {
         // (De)serialization
         let serialization_func_code = make_serialization_code(&struct_body);
         let deserialization_func_code = make_deserialization_code(&struct_body);
-        let ser_code = quote!{
+        let ser_code = quote! {
             impl Xdr for #name {
                 #serialization_func_code
                 #deserialization_func_code
@@ -86,7 +86,7 @@ impl From<&Structdef> for TokenStream {
         };
 
         // Struct
-        quote!{
+        quote! {
             #struct_code
             #ser_code
         }
@@ -173,11 +173,16 @@ mod tests {
         assert!(st == struct_body, "Struct Body wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{
+        let rust_code: TokenStream = quote! {
             { x: i32, f: f64, }
         };
         let generated_code: TokenStream = (&struct_body).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Struct: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Struct: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -212,11 +217,16 @@ mod tests {
         assert!(st == struct_body, "Struct Body wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{
+        let rust_code: TokenStream = quote! {
             { x1_: u64, f: MyCustomType_2, }
         };
         let generated_code: TokenStream = (&struct_body).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Struct: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Struct: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -259,7 +269,7 @@ mod tests {
         assert!(struct_def == st, "Struct Def wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{
+        let rust_code: TokenStream = quote! {
             struct MyStruct_ {
                 x: i32,
                 f: f64,
@@ -281,9 +291,15 @@ mod tests {
                     }
                 }
             }
-        }.into();
+        }
+        .into();
         let generated_code: TokenStream = (&struct_def).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Struct: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Struct: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -305,10 +321,15 @@ mod tests {
         assert!(struct_body == st, "Struct Type Spec wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{
+        let rust_code: TokenStream = quote! {
             { x: i32, }
         };
         let generated_code: TokenStream = (&struct_body).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Struct: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Struct: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 }

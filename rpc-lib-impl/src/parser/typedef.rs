@@ -12,7 +12,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use super::datatype::DataType;
-use super::declaration::{Declaration, DeclarationType, decl_type_to_rust};
+use super::declaration::{decl_type_to_rust, Declaration, DeclarationType};
 
 #[derive(PartialEq)]
 pub struct Typedef {
@@ -34,7 +34,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Typedef {
         let decl_token = type_def.into_inner().next().unwrap();
         let decl = Declaration::from(decl_token);
         Typedef {
-            orig_type: decl.data_type,  
+            orig_type: decl.data_type,
             decl_type: decl.decl_type,
             name: decl.name,
         }
@@ -50,21 +50,30 @@ mod tests {
     #[test]
     fn parse_typedef_1() {
         // Parser
-        let mut parsed = RPCLParser::parse(Rule::type_def, "typedef unsigned int uint_32_t;").unwrap();
+        let mut parsed =
+            RPCLParser::parse(Rule::type_def, "typedef unsigned int uint_32_t;").unwrap();
         let typedef_generated = Typedef::from(parsed.next().unwrap());
         let typedef_coded = Typedef {
             name: "uint_32_t".to_string(),
-            orig_type: DataType::Integer{ length: 32, signed: false },
+            orig_type: DataType::Integer {
+                length: 32,
+                signed: false,
+            },
             decl_type: DeclarationType::TypeNameDecl,
         };
         assert!(typedef_generated == typedef_coded, "Typedef parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{
+        let rust_code: TokenStream = quote! {
             type uint_32_t = u32;
         };
         let generated_code: TokenStream = (&typedef_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Typedef: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Typedef: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -74,17 +83,24 @@ mod tests {
         let typedef_generated = Typedef::from(parsed.next().unwrap());
         let typedef_coded = Typedef {
             name: "rpc_uuid".to_string(),
-            orig_type: DataType::TypeDef{ name: "char".to_string() },
+            orig_type: DataType::TypeDef {
+                name: "char".to_string(),
+            },
             decl_type: DeclarationType::VarlenArray,
         };
         assert!(typedef_generated == typedef_coded, "Typedef parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{
+        let rust_code: TokenStream = quote! {
             type rpc_uuid = std::vec::Vec<char>;
         };
         let generated_code: TokenStream = (&typedef_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Typedef: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Typedef: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -94,16 +110,23 @@ mod tests {
         let typedef_generated = Typedef::from(parsed.next().unwrap());
         let typedef_coded = Typedef {
             name: "mem_data".to_string(),
-            orig_type: DataType::TypeDef{ name: "opaque".to_string() },
+            orig_type: DataType::TypeDef {
+                name: "opaque".to_string(),
+            },
             decl_type: DeclarationType::VarlenArray,
         };
         assert!(typedef_generated == typedef_coded, "Typedef parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{
+        let rust_code: TokenStream = quote! {
             type mem_data = std::vec::Vec<opaque>;
         };
         let generated_code: TokenStream = (&typedef_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Typedef: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Typedef: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 }

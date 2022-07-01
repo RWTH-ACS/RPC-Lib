@@ -19,7 +19,10 @@ pub struct Program {
 
 impl From<&Program> for TokenStream {
     fn from(program: &Program) -> TokenStream {
-        assert!(program.versions.len() == 1, "Multiple Versions not supported!");
+        assert!(
+            program.versions.len() == 1,
+            "Multiple Versions not supported!"
+        );
         let mut version_code = quote!();
         for version in &program.versions {
             let code: TokenStream = version.into();

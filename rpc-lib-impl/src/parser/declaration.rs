@@ -30,25 +30,26 @@ pub struct Declaration {
 }
 
 pub fn decl_type_to_rust(decl_type: &DeclarationType, data_type: &DataType) -> TokenStream {
-        let data_type: TokenStream = data_type.into();
-        match &decl_type {
-            DeclarationType::Optional => {
-                quote!(std::Option<#data_type>)
-            }
-            DeclarationType::VarlenArray => {
-                quote!(std::vec::Vec<#data_type>)
-            }
-            DeclarationType::FixedlenArray { length } => {
-                let len: TokenStream = length.into();
-                quote!([#data_type; #len])
-            }
-            DeclarationType::TypeNameDecl => {
-                quote!(#data_type)
-            }
-            DeclarationType::VoidDecl => {
-                quote!()
-            }
-        }.into()
+    let data_type: TokenStream = data_type.into();
+    match &decl_type {
+        DeclarationType::Optional => {
+            quote!(std::Option<#data_type>)
+        }
+        DeclarationType::VarlenArray => {
+            quote!(std::vec::Vec<#data_type>)
+        }
+        DeclarationType::FixedlenArray { length } => {
+            let len: TokenStream = length.into();
+            quote!([#data_type; #len])
+        }
+        DeclarationType::TypeNameDecl => {
+            quote!(#data_type)
+        }
+        DeclarationType::VoidDecl => {
+            quote!()
+        }
+    }
+    .into()
 }
 
 impl From<&Declaration> for TokenStream {
@@ -57,8 +58,7 @@ impl From<&Declaration> for TokenStream {
         let decl_type_code = decl_type_to_rust(&decl.decl_type, &decl.data_type);
         if decl.decl_type != DeclarationType::VoidDecl {
             quote!( #name: #decl_type_code )
-        }
-        else {
+        } else {
             quote!()
         }
     }
@@ -94,7 +94,9 @@ fn parse_fixedlen_array(fixedlen_array: pest::iterators::Pair<'_, Rule>) -> Decl
     let fixedlen_name = it.next().unwrap();
     let fixedlen_len = it.next().unwrap();
     Declaration {
-        decl_type: DeclarationType::FixedlenArray { length: Value::from(fixedlen_len) },
+        decl_type: DeclarationType::FixedlenArray {
+            length: Value::from(fixedlen_len),
+        },
         data_type: DataType::from(fixedlen_type),
         name: fixedlen_name.as_str().to_string(),
     }
@@ -170,15 +172,23 @@ mod tests {
         let decl_generated = parse_varlen_array(parsed.next().unwrap());
         let decl_coded = Declaration {
             decl_type: DeclarationType::VarlenArray,
-            data_type: DataType::Integer { length: 32, signed: false },
+            data_type: DataType::Integer {
+                length: 32,
+                signed: false,
+            },
             name: "array".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{ array: std::vec::Vec<u32> };
+        let rust_code: TokenStream = quote! { array: std::vec::Vec<u32> };
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -188,15 +198,23 @@ mod tests {
         let decl_generated = parse_varlen_array(parsed.next().unwrap());
         let decl_coded = Declaration {
             decl_type: DeclarationType::VarlenArray,
-            data_type: DataType::Integer { length: 64, signed: true },
+            data_type: DataType::Integer {
+                length: 64,
+                signed: true,
+            },
             name: "array2_".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{ array2_: std::vec::Vec<i64> };
+        let rust_code: TokenStream = quote! { array2_: std::vec::Vec<i64> };
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -206,15 +224,22 @@ mod tests {
         let decl_generated = parse_varlen_array(parsed.next().unwrap());
         let decl_coded = Declaration {
             decl_type: DeclarationType::VarlenArray,
-            data_type: DataType::TypeDef { name: "CustomType".to_string() },
+            data_type: DataType::TypeDef {
+                name: "CustomType".to_string(),
+            },
             name: "_XR234z".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{ _XR234z: std::vec::Vec<CustomType> };
+        let rust_code: TokenStream = quote! { _XR234z: std::vec::Vec<CustomType> };
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -223,16 +248,26 @@ mod tests {
         let mut parsed = RPCLParser::parse(Rule::fixedlen_array, "int arr[0x23]").unwrap();
         let decl_generated = parse_fixedlen_array(parsed.next().unwrap());
         let decl_coded = Declaration {
-            decl_type: DeclarationType::FixedlenArray { length: Value::Numeric { val: 0x23 } },
-            data_type: DataType::Integer { length: 32, signed: true },
+            decl_type: DeclarationType::FixedlenArray {
+                length: Value::Numeric { val: 0x23 },
+            },
+            data_type: DataType::Integer {
+                length: 32,
+                signed: true,
+            },
             name: "arr".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{ arr: [i32; 35i64] };
+        let rust_code: TokenStream = quote! { arr: [i32; 35i64] };
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -241,16 +276,25 @@ mod tests {
         let mut parsed = RPCLParser::parse(Rule::fixedlen_array, "CustomType _XR234z[25]").unwrap();
         let decl_generated = parse_fixedlen_array(parsed.next().unwrap());
         let decl_coded = Declaration {
-            decl_type: DeclarationType::FixedlenArray { length: Value::Numeric { val: 25 } },
-            data_type: DataType::TypeDef { name: "CustomType".to_string() },
+            decl_type: DeclarationType::FixedlenArray {
+                length: Value::Numeric { val: 25 },
+            },
+            data_type: DataType::TypeDef {
+                name: "CustomType".to_string(),
+            },
             name: "_XR234z".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{ _XR234z: [CustomType; 25i64] };
+        let rust_code: TokenStream = quote! { _XR234z: [CustomType; 25i64] };
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -260,15 +304,22 @@ mod tests {
         let decl_generated = Declaration::from(parsed.next().unwrap());
         let decl_coded = Declaration {
             decl_type: DeclarationType::TypeNameDecl,
-            data_type: DataType::TypeDef { name: "CustomType".to_string() },
+            data_type: DataType::TypeDef {
+                name: "CustomType".to_string(),
+            },
             name: "name_23Z".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{ name_23Z: CustomType };
+        let rust_code: TokenStream = quote! { name_23Z: CustomType };
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -284,9 +335,14 @@ mod tests {
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{ x: String };
+        let rust_code: TokenStream = quote! { x: String };
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -302,9 +358,14 @@ mod tests {
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{ _2x: String };
+        let rust_code: TokenStream = quote! { _2x: String };
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
@@ -314,31 +375,47 @@ mod tests {
         let decl_generated = Declaration::from(parsed.next().unwrap());
         let decl_coded = Declaration {
             decl_type: DeclarationType::Optional,
-            data_type: DataType::TypeDef { name: "CustomType".to_string() },
+            data_type: DataType::TypeDef {
+                name: "CustomType".to_string(),
+            },
             name: "name_23Z".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!( name_23Z: std::Option<CustomType>);
+        let rust_code: TokenStream = quote!(name_23Z: std::Option<CustomType>);
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
     fn decl_test_optional_2() {
-        let mut parsed = RPCLParser::parse(Rule::declaration, "unsigned hyper *Optional_2_Int").unwrap();
+        let mut parsed =
+            RPCLParser::parse(Rule::declaration, "unsigned hyper *Optional_2_Int").unwrap();
         let decl_generated = Declaration::from(parsed.next().unwrap());
         let decl_coded = Declaration {
             decl_type: DeclarationType::Optional,
-            data_type: DataType::Integer{ length: 64, signed: false },
+            data_type: DataType::Integer {
+                length: 64,
+                signed: false,
+            },
             name: "Optional_2_Int".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!( Optional_2_Int: std::Option<u64>);
+        let rust_code: TokenStream = quote!(Optional_2_Int: std::Option<u64>);
         let generated_code: TokenStream = (&decl_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Declaration: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Declaration: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 }

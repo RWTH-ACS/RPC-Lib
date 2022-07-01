@@ -31,16 +31,16 @@ impl From<&Procedure> for TokenStream {
             let arg_name = format_ident!("x{}", i);
             let arg_type: TokenStream = arg.into();
             args = quote!( #args #arg_name: &#arg_type,);
-            serialization_code = quote!( #serialization_code #arg_name.serialize(&mut send_data)?; );
+            serialization_code =
+                quote!( #serialization_code #arg_name.serialize(&mut send_data)?; );
             i = i + 1;
         }
         let proc_num: TokenStream = (&proc.num).into();
         if proc.return_type == DataType::Void {
-            quote!{ fn #proc_name (&self, #args) { }}
-        }
-        else {
+            quote! { fn #proc_name (&self, #args) { }}
+        } else {
             let return_type: TokenStream = (&proc.return_type).into();
-            quote!{ fn #proc_name (&mut self, #args) -> std::io::Result<#return_type> {
+            quote! { fn #proc_name (&mut self, #args) -> std::io::Result<#return_type> {
                 // Parameter-Seralization
                 #serialization_code
 
@@ -88,13 +88,17 @@ mod tests {
     #[test]
     fn parse_procedure_1() {
         // Parsing
-        let mut parsed = RPCLParser::parse(Rule::procedure_def, "float PROC_NAME(int, float) = 1;").unwrap();
+        let mut parsed =
+            RPCLParser::parse(Rule::procedure_def, "float PROC_NAME(int, float) = 1;").unwrap();
         let proc_generated = Procedure::from(parsed.next().unwrap());
         let proc_coded = Procedure {
             name: "PROC_NAME".to_string(),
             return_type: DataType::Float { length: 32 },
             args: vec![
-                DataType::Integer { length: 32, signed: true },
+                DataType::Integer {
+                    length: 32,
+                    signed: true,
+                },
                 DataType::Float { length: 32 },
             ],
             num: Value::Numeric { val: 1 },
@@ -102,7 +106,7 @@ mod tests {
         assert!(proc_generated == proc_coded, "Procedure parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{
+        let rust_code: TokenStream = quote! {
             fn PROC_NAME(&mut self, x0: &i32, x1: &f32, ) -> std::io::Result<f32> {
                 let mut send_data = std::vec::Vec::new();
                 x0.serialize(&mut send_data)?;
@@ -113,12 +117,18 @@ mod tests {
             }
         };
         let generated_code: TokenStream = (&proc_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Procedure: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Procedure: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 
     #[test]
     fn parse_procedure_2() {
-        let mut parsed = RPCLParser::parse(Rule::procedure_def, "void PROC_NAME(void) = 0x24;").unwrap();
+        let mut parsed =
+            RPCLParser::parse(Rule::procedure_def, "void PROC_NAME(void) = 0x24;").unwrap();
         let proc_generated = Procedure::from(parsed.next().unwrap());
         let proc_coded = Procedure {
             name: "PROC_NAME".to_string(),
@@ -129,10 +139,15 @@ mod tests {
         assert!(proc_generated == proc_coded, "Procedure parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote!{
+        let rust_code: TokenStream = quote! {
             fn PROC_NAME(&self, ) { }
         };
         let generated_code: TokenStream = (&proc_generated).into();
-        assert!(generated_code.to_string() == rust_code.to_string(), "Procedure: Generated code wrong:\n{}\n{}", generated_code.to_string() , rust_code.to_string());
+        assert!(
+            generated_code.to_string() == rust_code.to_string(),
+            "Procedure: Generated code wrong:\n{}\n{}",
+            generated_code.to_string(),
+            rust_code.to_string()
+        );
     }
 }

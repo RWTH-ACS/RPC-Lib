@@ -37,7 +37,7 @@ pub fn parse(x_file: &String, struct_name: &String) -> (TokenStream, u32, u32) {
                 program_number = program.program_number;
                 version_number = program.versions[0].version_number;
                 let proc_code: TokenStream = (&program).into();
-                code = quote!{
+                code = quote! {
                     #code
                     use crate::rpc_lib::Xdr;
                     impl #s_name {
@@ -45,8 +45,7 @@ pub fn parse(x_file: &String, struct_name: &String) -> (TokenStream, u32, u32) {
                     }
                 };
             }
-            _ => {
-            }
+            _ => {}
         }
     }
     (code.into(), program_number, version_number)
