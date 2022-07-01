@@ -65,7 +65,7 @@ fn make_deserialize_function_code(union: &Union) -> TokenStream {
 
     // Construct Function:
     quote! {
-        fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
+        fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
             let err_code = i32::deserialize(bytes, parse_index);
             match err_code {
                 #match_code
@@ -356,7 +356,7 @@ mod tests {
         let rust_code: TokenStream = quote!{
             enum MyUnion2 { Case0 { result: i32 }, Case2 { result: f32 }, CaseDefault, }
             impl Xdr for MyUnion2 {
-                fn deserialize(bytes: &Vec<u8> , parse_index: &mut usize) -> Self {
+                fn deserialize(bytes: &[u8] , parse_index: &mut usize) -> Self {
                     let err_code = i32::deserialize(bytes, parse_index);
                     match err_code {
                         0i32 => Self::Case0 { result: i32::deserialize(bytes, parse_index) },

@@ -16,7 +16,7 @@ pub trait Xdr {
     // Serializes data and converts to network byte order
     fn serialize(&self) -> std::vec::Vec<u8>;
     // Reverse Operation
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self;
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self;
 }
 
 /// Implementation for fixed-size arrays
@@ -29,7 +29,7 @@ impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
         vec
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> [T; LEN] {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> [T; LEN] {
         let mut array: [T; LEN] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
 
         for i in 0..LEN {
@@ -60,7 +60,7 @@ impl<T: std::clone::Clone> Xdr for Vec<T> {
         vec
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Vec<T> {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Vec<T> {
         // Length
         let len: usize = u32::deserialize(bytes, parse_index).try_into().unwrap();
 
@@ -83,7 +83,7 @@ impl Xdr for i32 {
         self.to_be_bytes().to_vec()
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> i32 {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> i32 {
         let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
         *parse_index += 4;
         i32::from_be_bytes(*x)
@@ -95,7 +95,7 @@ impl Xdr for u32 {
         self.to_be_bytes().to_vec()
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> u32 {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> u32 {
         let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
         *parse_index += 4;
         u32::from_be_bytes(*x)
@@ -107,7 +107,7 @@ impl Xdr for i64 {
         self.to_be_bytes().to_vec()
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> i64 {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> i64 {
         let x = <&[u8; 8]>::try_from(&bytes[*parse_index..*parse_index + 8]).unwrap();
         *parse_index += 8;
         i64::from_be_bytes(*x)
@@ -119,7 +119,7 @@ impl Xdr for u64 {
         self.to_be_bytes().to_vec()
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> u64 {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> u64 {
         let x = <&[u8; 8]>::try_from(&bytes[*parse_index..*parse_index + 8]).unwrap();
         *parse_index += 8;
         u64::from_be_bytes(*x)
@@ -138,7 +138,7 @@ impl Xdr for String {
         vec
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> String {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> String {
         let len: usize = u32::deserialize(bytes, parse_index).try_into().unwrap();
         let s = String::from_utf8(bytes[*parse_index..*parse_index + len].to_vec()).unwrap();
         let len_and_padding = ((len + 4) / 4) * 4;
@@ -152,7 +152,7 @@ impl Xdr for f32 {
         self.to_be_bytes().to_vec()
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> f32 {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> f32 {
         let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
         *parse_index += 4;
         f32::from_be_bytes(*x)
@@ -164,7 +164,7 @@ impl Xdr for f64 {
         self.to_be_bytes().to_vec()
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> f64 {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> f64 {
         let x = <&[u8; 8]>::try_from(&bytes[*parse_index..*parse_index + 8]).unwrap();
         *parse_index += 8;
         f64::from_be_bytes(*x)

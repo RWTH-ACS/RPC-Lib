@@ -49,7 +49,7 @@ fn make_deserialization_code(struct_body: &Struct) -> TokenStream {
         deserialization_code = quote!( #deserialization_code #field_name: <#field_type> :: deserialize(bytes, parse_index), )
     }
     quote!{
-        fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
+        fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
             Self {
                 #deserialization_code
             }
@@ -275,7 +275,7 @@ mod tests {
                     vec
                 }
 
-                fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Self {
+                fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
                     Self {
                         x: <i32>::deserialize(bytes, parse_index),
                         f: <f64>::deserialize(bytes, parse_index),

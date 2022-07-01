@@ -33,7 +33,7 @@ impl Xdr for Rpcb {
         vec
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> Rpcb {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Rpcb {
         Rpcb {
             program: u32::deserialize(bytes, parse_index),
             version: u32::deserialize(bytes, parse_index),
@@ -61,7 +61,7 @@ impl Xdr for FragmentHeader {
         vec
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> FragmentHeader {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> FragmentHeader {
         let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
         *parse_index += 4;
         let num = u32::from_be_bytes(*x);
@@ -89,7 +89,7 @@ impl Xdr for RpcCall {
         vec
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> RpcCall {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> RpcCall {
         RpcCall {
             fragment_header: FragmentHeader::deserialize(bytes, parse_index),
             xid: u32::deserialize(bytes, parse_index),
@@ -121,7 +121,7 @@ impl Xdr for RpcRequest {
         vec
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> RpcRequest {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> RpcRequest {
         RpcRequest {
             header: RpcCall::deserialize(bytes, parse_index),
             rpc_version: u32::deserialize(bytes, parse_index),
@@ -153,7 +153,7 @@ impl Xdr for RpcReply {
         vec
     }
 
-    fn deserialize(bytes: &Vec<u8>, parse_index: &mut usize) -> RpcReply {
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> RpcReply {
         RpcReply {
             header: RpcCall::deserialize(bytes, parse_index),
             reply_state: u32::deserialize(bytes, parse_index),
@@ -250,12 +250,12 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     })
 }
 
-pub fn rpc_call(client: &mut RpcClient, procedure: u32, send: &Vec<u8>) -> Result<Vec<u8>> {
+pub fn rpc_call(client: &mut RpcClient, procedure: u32, send: &[u8]) -> Result<Vec<u8>> {
     send_rpc_request(client, procedure, send)?;
     receive_rpc_reply(client)
 }
 
-fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &Vec<u8>) -> Result<()> {
+fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &[u8]) -> Result<()> {
     const REQUEST_HEADER_LEN: usize = 40;
     let length = REQUEST_HEADER_LEN + send_data.len();
 
