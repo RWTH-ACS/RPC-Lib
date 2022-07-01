@@ -30,7 +30,6 @@
 //!     println!("MY_RPC_PROCEDURE returned: {}", result);
 //! }
 //! ```
-extern crate quote;
 extern crate rpc_lib_impl;
 
 mod rpc_struct;
