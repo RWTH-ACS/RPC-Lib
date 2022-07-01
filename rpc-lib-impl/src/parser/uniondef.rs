@@ -90,8 +90,8 @@ fn make_serialization_function_code(union: &Union) -> TokenStream {
                 let decl_type: TokenStream = (&data_decl.data_type).into();
                 match_arms = quote!{ #match_arms
                     Self :: #case_ident { #decl_name } => {
-                        vec.extend(i32::serialize(&#number));
-                        vec.extend(<#decl_type>::serialize(&#decl_name));
+                        i32::serialize(&#number, &mut writer)?;
+                        <#decl_type>::serialize(&#decl_name, &mut writer)?;
                     }
                 };
             }
@@ -105,12 +105,11 @@ fn make_serialization_function_code(union: &Union) -> TokenStream {
         DiscriminantType::Enum { name: _ } => panic!("Enum as discriminant not implemented yet"),
     }
     quote!{
-        fn serialize(&self) -> std::vec::Vec<u8> {
-            let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+        fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
             match self {
                 #match_arms
             }
-            vec
+            Ok(())
         }
     }
 }
@@ -365,20 +364,19 @@ mod tests {
                         _ => panic!("Unknown field of discriminated union with Field-Value {}", err_code),
                     }
                 }
-                fn serialize(&self) -> std::vec::Vec<u8> {
-                    let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+                fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
                     match self {
                         Self::Case0 { result } => {
-                            vec.extend(i32::serialize(&0i32));
-                            vec.extend(<i32>::serialize(&result));
+                            i32::serialize(&0i32, &mut writer)?;
+                            <i32>::serialize(&result, &mut writer)?;
                         }
                         Self::Case2 { result } => {
-                            vec.extend(i32::serialize(&2i32));
-                            vec.extend(<f32>::serialize(&result));
+                            i32::serialize(&2i32, &mut writer)?;
+                            <f32>::serialize(&result, &mut writer)?;
                         }
                         Self::CaseDefault => { }
                     }
-                    vec
+                    Ok(())
                 }
             }
         };

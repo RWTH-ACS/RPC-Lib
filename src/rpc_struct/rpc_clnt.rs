@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::io::prelude::*;
+use std::io::{self, prelude::*};
 use std::net::TcpStream;
 use std::vec::Vec;
 
@@ -23,14 +23,13 @@ struct Rpcb {
 }
 
 impl Xdr for Rpcb {
-    fn serialize(&self) -> Vec<u8> {
-        let mut vec = Vec::new();
-        vec.extend(self.program.serialize());
-        vec.extend(self.version.serialize());
-        vec.extend(self.netid.serialize());
-        vec.extend(self.address.serialize());
-        vec.extend(self.owner.serialize());
-        vec
+    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
+        self.program.serialize(&mut writer)?;
+        self.version.serialize(&mut writer)?;
+        self.netid.serialize(&mut writer)?;
+        self.address.serialize(&mut writer)?;
+        self.owner.serialize(&mut writer)?;
+        Ok(())
     }
 
     fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Rpcb {
@@ -51,14 +50,13 @@ struct FragmentHeader {
 }
 
 impl Xdr for FragmentHeader {
-    fn serialize(&self) -> Vec<u8> {
-        let mut vec = Vec::new();
+    fn serialize(&self, writer: impl Write) -> io::Result<()> {
         if self.last_fragment {
-            vec.extend((self.length + (1 << 31)).serialize());
+            (self.length + (1 << 31)).serialize(writer)?;
         } else {
-            vec.extend(self.length.serialize());
+            self.length.serialize(writer)?;
         }
-        vec
+        Ok(())
     }
 
     fn deserialize(bytes: &[u8], parse_index: &mut usize) -> FragmentHeader {
@@ -81,12 +79,11 @@ struct RpcCall {
 }
 
 impl Xdr for RpcCall {
-    fn serialize(&self) -> Vec<u8> {
-        let mut vec = Vec::new();
-        vec.extend(self.fragment_header.serialize());
-        vec.extend(self.xid.serialize());
-        vec.extend(self.msg_type.serialize());
-        vec
+    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
+        self.fragment_header.serialize(&mut writer)?;
+        self.xid.serialize(&mut writer)?;
+        self.msg_type.serialize(&mut writer)?;
+        Ok(())
     }
 
     fn deserialize(bytes: &[u8], parse_index: &mut usize) -> RpcCall {
@@ -109,16 +106,15 @@ struct RpcRequest {
 }
 
 impl Xdr for RpcRequest {
-    fn serialize(&self) -> Vec<u8> {
-        let mut vec = Vec::new();
-        vec.extend(self.header.serialize());
-        vec.extend(self.rpc_version.serialize());
-        vec.extend(self.program_num.serialize());
-        vec.extend(self.version_num.serialize());
-        vec.extend(self.proc_num.serialize());
-        vec.extend(self.credentials.serialize());
-        vec.extend(self.verifier.serialize());
-        vec
+    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
+        self.header.serialize(&mut writer)?;
+        self.rpc_version.serialize(&mut writer)?;
+        self.program_num.serialize(&mut writer)?;
+        self.version_num.serialize(&mut writer)?;
+        self.proc_num.serialize(&mut writer)?;
+        self.credentials.serialize(&mut writer)?;
+        self.verifier.serialize(&mut writer)?;
+        Ok(())
     }
 
     fn deserialize(bytes: &[u8], parse_index: &mut usize) -> RpcRequest {
@@ -144,13 +140,12 @@ struct RpcReply {
 }
 
 impl Xdr for RpcReply {
-    fn serialize(&self) -> Vec<u8> {
-        let mut vec = Vec::new();
-        vec.extend(self.header.serialize());
-        vec.extend(self.reply_state.serialize());
-        vec.extend(self.verifier.serialize());
-        vec.extend(self.accept_state.serialize());
-        vec
+    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
+        self.header.serialize(&mut writer)?;
+        self.reply_state.serialize(&mut writer)?;
+        self.verifier.serialize(&mut writer)?;
+        self.accept_state.serialize(&mut writer)?;
+        Ok(())
     }
 
     fn deserialize(bytes: &[u8], parse_index: &mut usize) -> RpcReply {
@@ -230,7 +225,12 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     };
 
     // Proc 3: GETADDR
-    let vec = rpc_call(&mut client, 3, &rpcb.serialize())?;
+    let send = {
+        let mut send = Vec::new();
+        rpcb.serialize(&mut send)?;
+        send
+    };
+    let vec = rpc_call(&mut client, 3, &send)?;
 
     // Parse Universal Address & Convert to Standard IP-Format
     let mut parse_index = 0;
@@ -281,7 +281,11 @@ fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &[u8]) ->
     };
 
     // Send Request
-    let request_header = request.serialize();
+    let request_header = {
+        let mut request_header = Vec::new();
+        request.serialize(&mut request_header)?;
+        request_header
+    };
     client.stream.write_all(&request_header)?;
     client.stream.write_all(&*send_data)?;
     Ok(())

@@ -29,14 +29,13 @@ fn make_serialization_code(struct_body: &Struct) -> TokenStream {
     for field in &struct_body.fields {
         let field_name = format_ident!("{}", &field.name);
         serialization_code = quote!{
-            #serialization_code vec.extend(self.#field_name.serialize());
+            #serialization_code self.#field_name.serialize(&mut writer)?;
         };
     }
     quote!{
-        fn serialize(&self) -> std::vec::Vec<u8> {
-            let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
+        fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
             #serialization_code
-            vec
+            Ok(())
         }
     }
 }
@@ -267,12 +266,11 @@ mod tests {
                 t: MyType,
             }
             impl Xdr for MyStruct_ {
-                fn serialize(&self) -> std::vec::Vec<u8> {
-                    let mut vec: std::vec::Vec<u8> = std::vec::Vec::new();
-                    vec.extend(self.x.serialize());
-                    vec.extend(self.f.serialize());
-                    vec.extend(self.t.serialize());
-                    vec
+                fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
+                    self.x.serialize(&mut writer)?;
+                    self.f.serialize(&mut writer)?;
+                    self.t.serialize(&mut writer)?;
+                    Ok(())
                 }
 
                 fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {

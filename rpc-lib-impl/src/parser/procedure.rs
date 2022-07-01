@@ -31,7 +31,7 @@ impl From<&Procedure> for TokenStream {
             let arg_name = format_ident!("x{}", i);
             let arg_type: TokenStream = arg.into();
             args = quote!( #args #arg_name: &#arg_type,);
-            serialization_code = quote!( #serialization_code send_data.extend(#arg_name.serialize()); );
+            serialization_code = quote!( #serialization_code #arg_name.serialize(&mut send_data)?; );
             i = i + 1;
         }
         let proc_num: TokenStream = (&proc.num).into();
@@ -105,8 +105,8 @@ mod tests {
         let rust_code: TokenStream = quote!{
             fn PROC_NAME(&mut self, x0: &i32, x1: &f32, ) -> std::io::Result<f32> {
                 let mut send_data = std::vec::Vec::new();
-                send_data.extend(x0.serialize());
-                send_data.extend(x1.serialize());
+                x0.serialize(&mut send_data)?;
+                x1.serialize(&mut send_data)?;
                 let recv = rpc_lib::rpc_call(&mut self.client, 1i64 as u32, &send_data)?;
                 let mut parse_index = 0;
                 Ok(<f32>::deserialize(&recv, &mut parse_index))
