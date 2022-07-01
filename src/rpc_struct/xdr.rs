@@ -49,7 +49,7 @@ impl<T: std::clone::Clone> Xdr for Vec<T> {
         // Data in Vector
         let slice = unsafe { std::mem::transmute::<&[T], &[u8]>(&self) };
         vec.extend(slice);
-        
+
         // Alignment on 4 bytes
         if data_len % 4 != 0 {
             let padding = ((data_len / 4) * 4 + 4) - data_len;
@@ -65,7 +65,8 @@ impl<T: std::clone::Clone> Xdr for Vec<T> {
         let len: usize = u32::deserialize(bytes, parse_index).try_into().unwrap();
 
         // Data
-        let slice = unsafe { std::mem::transmute::<&[u8], &[T]>(&bytes[*parse_index..*parse_index + len]) };
+        let slice =
+            unsafe { std::mem::transmute::<&[u8], &[T]>(&bytes[*parse_index..*parse_index + len]) };
         let vec = slice.to_vec();
 
         // Alignment on 4 bytes
@@ -73,7 +74,7 @@ impl<T: std::clone::Clone> Xdr for Vec<T> {
             let padding = ((len / 4) * 4 + 4) - len;
             *parse_index += padding;
         }
-        
+
         vec
     }
 }

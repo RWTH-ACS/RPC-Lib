@@ -172,7 +172,7 @@ struct UniversalAddress {
 /// Contains required fields to make RPC-Calls.
 ///
 /// Consists of:
-///  - An already connected [`TcpStream`] 
+///  - An already connected [`TcpStream`]
 ///  - Program-Number (as defined in RPCL-File)
 ///  - Version-Number (as defined in RPCL-File)
 #[derive(Debug)]
@@ -236,7 +236,10 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     let mut parse_index = 0;
     let universal_address_s = String::deserialize(&vec, &mut parse_index);
     if universal_address_s.len() == 0 {
-        return Err(Error::new(ErrorKind::Other, "clnt_create: Rpc-Server not available"));
+        return Err(Error::new(
+            ErrorKind::Other,
+            "clnt_create: Rpc-Server not available",
+        ));
     }
     let ip = UniversalAddress::from_string(&universal_address_s);
 
@@ -294,7 +297,8 @@ fn receive_rpc_reply(client: &mut RpcClient) -> Result<Vec<u8>> {
     const REPLY_HEADER_LEN: usize = 24;
     let mut vec: Vec<u8> = Vec::new();
     // Receive first fragment
-    let mut last_fragment = receive_reply_packet(client, &mut vec, FRAGMENT_HEADER_LEN + REPLY_HEADER_LEN)?;
+    let mut last_fragment =
+        receive_reply_packet(client, &mut vec, FRAGMENT_HEADER_LEN + REPLY_HEADER_LEN)?;
     while !last_fragment {
         // Receive following fragments
         last_fragment = receive_reply_packet(client, &mut vec, FRAGMENT_HEADER_LEN)?;
@@ -302,7 +306,11 @@ fn receive_rpc_reply(client: &mut RpcClient) -> Result<Vec<u8>> {
     Ok(vec)
 }
 
-fn receive_reply_packet(client: &mut RpcClient, buffer: &mut Vec<u8>, header_len: usize) -> Result<bool> {
+fn receive_reply_packet(
+    client: &mut RpcClient,
+    buffer: &mut Vec<u8>,
+    header_len: usize,
+) -> Result<bool> {
     // Receive Header
     let mut header_buf = Vec::with_capacity(header_len);
     header_buf.resize(header_len, 0);
@@ -310,12 +318,16 @@ fn receive_reply_packet(client: &mut RpcClient, buffer: &mut Vec<u8>, header_len
     let mut index: usize = 0;
     let (payload_length, last_fragment) = if header_len == 28 {
         let reply_header = RpcReply::deserialize(&header_buf.to_vec(), &mut index);
-        (reply_header.header.fragment_header.length as usize - header_len + 4,
-        reply_header.header.fragment_header.last_fragment)
+        (
+            reply_header.header.fragment_header.length as usize - header_len + 4,
+            reply_header.header.fragment_header.last_fragment,
+        )
     } else {
         let fragment_header = FragmentHeader::deserialize(&header_buf, &mut index);
-        (fragment_header.length as usize - header_len + 4,
-        fragment_header.last_fragment)
+        (
+            fragment_header.length as usize - header_len + 4,
+            fragment_header.last_fragment,
+        )
     };
 
     // Receive Reply-Data
