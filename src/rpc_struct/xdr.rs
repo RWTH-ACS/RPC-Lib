@@ -8,6 +8,7 @@
 
 use std::convert::{TryFrom, TryInto};
 use std::io::{self, Write};
+use std::mem::MaybeUninit;
 use std::vec::Vec;
 
 /// Types with the `Xdr`-Trait can be serialised and deserialised as described in [`RFC 4506`]
@@ -31,12 +32,19 @@ impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
     }
 
     fn deserialize(bytes: &[u8], parse_index: &mut usize) -> [T; LEN] {
-        let mut array: [T; LEN] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        // SAFETY: An uninitialized `[MaybeUninit<_>; LEN]` is valid.
+        let mut array = unsafe { MaybeUninit::<[MaybeUninit<T>; LEN]>::uninit().assume_init() };
 
-        for i in 0..LEN {
-            array[i] = T::deserialize(bytes, parse_index);
+        for elem in &mut array[..] {
+            *elem = MaybeUninit::new(T::deserialize(bytes, parse_index));
         }
-        array
+
+        // SAFETY:
+        // * All elements of the array are initialized
+        // * `MaybeUninit<T>` and T are guaranteed to have the same layout
+        // * `MaybeUninit` does not drop, so there are no double-frees
+        // And thus the conversion is safe
+        unsafe { (&array as *const _ as *const [T; LEN]).read() }
     }
 }
 
