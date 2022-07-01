@@ -281,12 +281,7 @@ fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &[u8]) ->
     };
 
     // Send Request
-    let request_header = {
-        let mut request_header = Vec::new();
-        request.serialize(&mut request_header)?;
-        request_header
-    };
-    client.stream.write_all(&request_header)?;
+    request.serialize(&mut client.stream)?;
     client.stream.write_all(&*send_data)?;
     Ok(())
 }
