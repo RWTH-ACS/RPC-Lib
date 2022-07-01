@@ -24,10 +24,39 @@ fn padding(len: usize) -> usize {
     (4 - len % 4) % 4
 }
 
-/// Implementation for fixed-size arrays
-impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
+/// Fixed-Length Opaque Data
+impl<const LEN: usize> Xdr for [u8; LEN] {
+    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
+        writer.write_all(self)?;
+        writer.write_all(&[0u8; 3][..padding(LEN)])
+    }
+
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
+        let ret = bytes[..LEN].try_into().unwrap();
+        *parse_index += LEN + padding(LEN);
+        ret
+    }
+}
+
+/// Variable-Length Opaque Data
+impl Xdr for Vec<u8> {
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         (self.len() as u32).serialize(&mut writer)?;
+        writer.write_all(self)?;
+        writer.write_all(&[0u8; 3][..padding(self.len())])
+    }
+
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
+        let len = u32::deserialize(bytes, parse_index) as usize;
+        let ret = bytes[..len].into();
+        *parse_index += len + padding(len);
+        ret
+    }
+}
+
+/// Fixed-Length Array
+impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
+    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         for item in self {
             item.serialize(&mut writer)?;
         }
@@ -46,43 +75,22 @@ impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
     }
 }
 
-/// Implementation for Variable-Length arrays
-impl<T: std::clone::Clone> Xdr for Vec<T> {
+/// Variable-Length Array
+impl<T: Xdr> Xdr for Vec<T> {
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        // Length of data in bytes
-        let data_len = (self.len() * std::mem::size_of::<T>()) as u32;
-        data_len.serialize(&mut writer)?;
-
-        // Data in Vector
-        let slice = unsafe { std::mem::transmute::<&[T], &[u8]>(&self) };
-        writer.write_all(slice)?;
-
-        // Alignment on 4 bytes
-        if data_len % 4 != 0 {
-            let padding = ((data_len / 4) * 4 + 4) - data_len;
-            for _i in 0..padding {
-                writer.write_all(&[0])?;
-            }
+        (self.len() as u32).serialize(&mut writer)?;
+        for item in self {
+            item.serialize(&mut writer)?;
         }
         Ok(())
     }
 
     fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Vec<T> {
-        // Length
-        let len: usize = u32::deserialize(bytes, parse_index).try_into().unwrap();
-
-        // Data
-        let slice =
-            unsafe { std::mem::transmute::<&[u8], &[T]>(&bytes[*parse_index..*parse_index + len]) };
-        let vec = slice.to_vec();
-        *parse_index += len;
-
-        // Alignment on 4 bytes
-        if len % 4 != 0 {
-            let padding = ((len / 4) * 4 + 4) - len;
-            *parse_index += padding;
+        let len = u32::deserialize(bytes, parse_index).try_into().unwrap();
+        let mut vec = Vec::with_capacity(len);
+        for _ in 0..len {
+            vec.push(T::deserialize(bytes, parse_index));
         }
-
         vec
     }
 }
