@@ -317,7 +317,7 @@ fn receive_reply_packet(
     client.stream.read_exact(&mut header_buf)?;
     let mut index: usize = 0;
     let (payload_length, last_fragment) = if header_len == 28 {
-        let reply_header = RpcReply::deserialize(&header_buf.to_vec(), &mut index);
+        let reply_header = RpcReply::deserialize(&header_buf, &mut index);
         (
             reply_header.header.fragment_header.length as usize - header_len + 4,
             reply_header.header.fragment_header.last_fragment,
