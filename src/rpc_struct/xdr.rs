@@ -20,6 +20,10 @@ pub trait Xdr {
     fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self;
 }
 
+fn padding(len: usize) -> usize {
+    (4 - len % 4) % 4
+}
+
 /// Implementation for fixed-size arrays
 impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
@@ -136,8 +140,7 @@ impl Xdr for String {
         (self.len() as u32).serialize(&mut writer)?;
         writer.write_all(self.as_bytes())?;
         // Alignment on 4 bytes
-        let padding = ((self.len() / 4) * 4 + 4) - self.len();
-        for _i in 0..padding {
+        for _i in 0..padding(self.len()) {
             writer.write_all(&[0])?;
         }
         Ok(())
@@ -146,8 +149,7 @@ impl Xdr for String {
     fn deserialize(bytes: &[u8], parse_index: &mut usize) -> String {
         let len: usize = u32::deserialize(bytes, parse_index).try_into().unwrap();
         let s = String::from_utf8(bytes[*parse_index..*parse_index + len].to_vec()).unwrap();
-        let len_and_padding = ((len + 4) / 4) * 4;
-        *parse_index += len_and_padding;
+        *parse_index += len + padding(len);
         s
     }
 }
