@@ -77,6 +77,7 @@ impl<T: std::clone::Clone> Xdr for Vec<T> {
         let slice =
             unsafe { std::mem::transmute::<&[u8], &[T]>(&bytes[*parse_index..*parse_index + len]) };
         let vec = slice.to_vec();
+        *parse_index += len;
 
         // Alignment on 4 bytes
         if len % 4 != 0 {
