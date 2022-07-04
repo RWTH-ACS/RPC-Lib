@@ -25,7 +25,7 @@ test:unit:
   needs: ["prepare:centos8:docker-dev"]
   image: ${DOCKER_IMAGE_DEV}:${DOCKER_TAG}
   script:
-    - cd rpc-lib-derive && cargo test --workspace
+    - cargo test --package rpc-lib-derive
   tags:
     - docker
 
