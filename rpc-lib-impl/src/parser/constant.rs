@@ -26,7 +26,7 @@ pub enum Value {
 impl From<&ConstantDeclaration> for TokenStream {
     fn from(constant: &ConstantDeclaration) -> TokenStream {
         let name = format_ident!("{}", &constant.name);
-        let value: TokenStream = (&constant.value).into();
+        let value = TokenStream::from(&constant.value);
         quote!(const #name: i64 = #value;)
     }
 }

@@ -87,7 +87,7 @@ fn make_serialization_function_code(union: &Union) -> TokenStream {
                 } as i32;
                 let case_ident = format_ident!("Case{}", number as u32);
                 let decl_name = format_ident!("{}", data_decl.name);
-                let decl_type: TokenStream = (&data_decl.data_type).into();
+                let decl_type = TokenStream::from(&data_decl.data_type);
                 match_arms = quote! { #match_arms
                     Self :: #case_ident { #decl_name } => {
                         i32::serialize(&#number, &mut writer)?;
@@ -131,7 +131,7 @@ impl From<&Uniondef> for TokenStream {
                     union_body = quote!( #union_body #case_name,);
                 }
                 _ => {
-                    let data_type_code: TokenStream = (&decl.data_type).into();
+                    let data_type_code = TokenStream::from(&decl.data_type);
                     let decl_name_code = quote::format_ident!("{}", decl.name);
                     union_body =
                         quote!( #union_body #case_name { #decl_name_code: #data_type_code},);

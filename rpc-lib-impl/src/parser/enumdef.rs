@@ -27,7 +27,7 @@ pub struct Enum {
 impl From<&Enumdef> for TokenStream {
     fn from(enum_def: &Enumdef) -> TokenStream {
         let name = quote::format_ident!("{}", enum_def.name);
-        let enum_body: TokenStream = (&enum_def.enum_body).into();
+        let enum_body = TokenStream::from(&enum_def.enum_body);
         quote!(enum #name #enum_body)
     }
 }

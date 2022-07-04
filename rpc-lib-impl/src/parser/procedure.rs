@@ -35,11 +35,11 @@ impl From<&Procedure> for TokenStream {
                 quote!( #serialization_code #arg_name.serialize(&mut send_data)?; );
             i = i + 1;
         }
-        let proc_num: TokenStream = (&proc.num).into();
+        let proc_num = TokenStream::from(&proc.num);
         if proc.return_type == DataType::Void {
             quote! { fn #proc_name (&self, #args) { }}
         } else {
-            let return_type: TokenStream = (&proc.return_type).into();
+            let return_type = TokenStream::from(&proc.return_type);
             quote! { fn #proc_name (&mut self, #args) -> std::io::Result<#return_type> {
                 // Parameter-Seralization
                 #serialization_code

@@ -44,7 +44,7 @@ fn make_deserialization_code(struct_body: &Struct) -> TokenStream {
     let mut deserialization_code = quote!();
     for field in &struct_body.fields {
         let field_name = format_ident!("{}", &field.name);
-        let field_type: TokenStream = (&field.data_type).into();
+        let field_type = TokenStream::from(&field.data_type);
         deserialization_code = quote!( #deserialization_code #field_name: <#field_type> :: deserialize(bytes, parse_index), )
     }
     quote! {
@@ -66,7 +66,7 @@ impl From<&Structdef> for TokenStream {
         let mut struct_code = quote!();
         for field in &struct_body.fields {
             let field_name = format_ident!("{}", &field.name);
-            let field_type: TokenStream = (&field.data_type).into();
+            let field_type = TokenStream::from(&field.data_type);
             struct_code = quote!( #struct_code #field_name: #field_type, );
         }
         struct_code = quote! {
@@ -76,8 +76,8 @@ impl From<&Structdef> for TokenStream {
         };
 
         // (De)serialization
-        let serialization_func_code = make_serialization_code(&struct_body);
-        let deserialization_func_code = make_deserialization_code(&struct_body);
+        let serialization_func_code = make_serialization_code(struct_body);
+        let deserialization_func_code = make_deserialization_code(struct_body);
         let ser_code = quote! {
             impl Xdr for #name {
                 #serialization_func_code

@@ -29,14 +29,14 @@ pub fn parse(x_file: &String, struct_name: &String) -> (TokenStream, u32, u32) {
         match token.as_rule() {
             Rule::specification => {
                 let spec = Specification::from(token);
-                let spec_code: TokenStream = (&spec).into();
+                let spec_code = TokenStream::from(&spec);
                 code = quote!(#code #spec_code);
             }
             Rule::program_def => {
                 let program = Program::from(token);
                 program_number = program.program_number;
                 version_number = program.versions[0].version_number;
-                let proc_code: TokenStream = (&program).into();
+                let proc_code = TokenStream::from(&program);
                 code = quote! {
                     #code
                     use crate::rpc_lib::Xdr;
