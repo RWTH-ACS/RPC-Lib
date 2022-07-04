@@ -311,8 +311,7 @@ fn receive_reply_packet(
     header_len: usize,
 ) -> Result<bool> {
     // Receive Header
-    let mut header_buf = Vec::with_capacity(header_len);
-    header_buf.resize(header_len, 0);
+    let mut header_buf = vec![0; header_len];
     client.stream.read_exact(&mut header_buf)?;
     let mut index: usize = 0;
     let (payload_length, last_fragment) = if header_len == 28 {
