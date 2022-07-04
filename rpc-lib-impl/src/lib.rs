@@ -43,8 +43,7 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
     //Extract Structname (struct <Name>;)
     let struct_name: String = item
         .into_iter()
-        .skip(1)
-        .next()
+        .nth(1)
         .expect("Invalid Syntax: Must be: struct <Name>;")
         .to_string();
 
