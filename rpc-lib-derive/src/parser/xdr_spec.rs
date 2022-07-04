@@ -78,7 +78,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Specification {
                 Rule::constant_def => {
                     spec.constants.push(ConstantDeclaration::from(definition));
                 }
-                _ => println!("Unknown Definition"),
+                _ => eprintln!("Unknown Definition"),
             }
         }
         spec

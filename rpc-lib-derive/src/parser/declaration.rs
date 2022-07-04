@@ -141,7 +141,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Declaration {
                         Rule::identifier => {
                             decl.name = token.as_str().to_string();
                         }
-                        _ => println!("Syntax error"),
+                        _ => eprintln!("Syntax error"),
                     }
                 }
             }
@@ -152,7 +152,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Declaration {
                     name: "".to_string(),
                 };
             }
-            _ => println!("Syntax error"),
+            _ => eprintln!("Syntax error"),
         }
         decl
     }

@@ -34,7 +34,7 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
     let mut s = String::new();
     file.read_to_string(&mut s)
         .unwrap_or_else(|_| panic!("Couldn't read {}", path.display()));
-    println!("Parsing {}", path.display());
+    eprintln!("Parsing {}", path.display());
 
     //Extract Structname (struct <Name>;)
     let struct_name: String = item
