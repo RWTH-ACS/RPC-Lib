@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::parser::parser::Rule;
+use crate::parser::Rule;
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -44,7 +44,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Typedef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::parser::RPCLParser;
+    use crate::parser::RPCLParser;
     use crate::pest::Parser;
 
     #[test]
