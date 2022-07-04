@@ -41,7 +41,6 @@ impl From<&Value> for TokenStream {
                 quote!(#name)
             }
         }
-        .into()
     }
 }
 

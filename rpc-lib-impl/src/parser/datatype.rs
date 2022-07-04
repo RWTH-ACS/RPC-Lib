@@ -70,7 +70,6 @@ impl From<&DataType> for TokenStream {
                 quote!()
             }
         }
-        .into()
     }
 }
 

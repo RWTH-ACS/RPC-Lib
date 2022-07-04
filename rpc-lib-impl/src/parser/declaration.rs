@@ -49,7 +49,6 @@ pub fn decl_type_to_rust(decl_type: &DeclarationType, data_type: &DataType) -> T
             quote!()
         }
     }
-    .into()
 }
 
 impl From<&Declaration> for TokenStream {
