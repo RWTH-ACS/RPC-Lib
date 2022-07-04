@@ -185,8 +185,8 @@ impl UniversalAddress {
             ip: [0, 0, 0, 0],
             port: 0,
         };
-        for i in 0..4 {
-            ret.ip[i] = splitted[i].parse::<u8>().unwrap();
+        for (i, splitted) in splitted.iter().enumerate().take(4) {
+            ret.ip[i] = splitted.parse::<u8>().unwrap();
         }
         ret.port = splitted[4].parse::<u16>().unwrap() * 256;
         ret.port += splitted[5].parse::<u16>().unwrap();
