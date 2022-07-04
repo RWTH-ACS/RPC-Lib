@@ -89,7 +89,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Specification {
 mod tests {
     use super::*;
     use crate::parser::RPCLParser;
-    use crate::pest::Parser;
+    use pest::Parser;
 
     #[test]
     fn parse_specification_1() {

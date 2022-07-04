@@ -106,7 +106,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Version {
 mod tests {
     use super::*;
     use crate::parser::RPCLParser;
-    use crate::pest::Parser;
+    use pest::Parser;
 
     // Tests program_def
     #[test]

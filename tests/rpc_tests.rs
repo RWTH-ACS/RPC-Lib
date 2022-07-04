@@ -1,4 +1,3 @@
-extern crate rpc_lib;
 use rpc_lib::include_rpcl;
 
 #[include_rpcl("tests/test.x")]

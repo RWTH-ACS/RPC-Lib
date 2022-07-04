@@ -87,7 +87,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Enum {
 mod tests {
     use super::*;
     use crate::parser::RPCLParser;
-    use crate::pest::Parser;
+    use pest::Parser;
 
     #[test]
     fn parse_enum_1() {

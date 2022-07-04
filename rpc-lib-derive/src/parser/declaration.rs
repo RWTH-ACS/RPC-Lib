@@ -162,7 +162,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Declaration {
 mod tests {
     use super::*;
     use crate::parser::RPCLParser;
-    use crate::pest::Parser;
+    use pest::Parser;
 
     #[test]
     fn decl_test_varlen_1() {

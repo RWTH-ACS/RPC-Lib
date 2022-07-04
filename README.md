@@ -36,7 +36,6 @@ program MATH {
 
 ```rust
 // src/main.rs
-extern crate rpc_lib;
 use rpc_lib::include_rpcl;
 
 #[include_rpcl("math.x")]

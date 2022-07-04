@@ -18,7 +18,6 @@
 //!
 //! Creates a connection to 127.0.0.1, makes an Rpc-Call and prints the result.
 //! ```rust
-//! extern crate rpc_lib;
 //! use rpc_lib::include_rpcl;
 //!
 //! #[include_rpcl("my_rpcl_file.x")]
@@ -28,7 +27,6 @@
 //! let result = rpc.MY_RPC_PROCEDURE(&1, &2).expect("Rpc call failed");
 //! println!("MY_RPC_PROCEDURE returned: {}", result);
 //! ```
-extern crate rpc_lib_derive;
 
 mod rpc_struct;
 

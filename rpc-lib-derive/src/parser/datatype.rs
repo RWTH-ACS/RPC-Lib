@@ -129,7 +129,7 @@ mod tests {
     use super::super::constant::Value;
     use super::*;
     use crate::parser::RPCLParser;
-    use crate::pest::Parser;
+    use pest::Parser;
 
     #[test]
     fn parse_type_spec_primitive_1() {

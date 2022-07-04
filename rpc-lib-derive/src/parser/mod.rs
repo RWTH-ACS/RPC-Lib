@@ -24,7 +24,7 @@ use quote::quote;
 use program::Program;
 use xdr_spec::Specification;
 
-#[derive(Parser)]
+#[derive(pest_derive::Parser)]
 #[grammar = "rpcl.pest"]
 pub struct RPCLParser;
 
@@ -50,7 +50,7 @@ pub fn parse(x_file: &str, struct_name: &str) -> (TokenStream, u32, u32) {
                 let proc_code = TokenStream::from(&program);
                 code = quote! {
                     #code
-                    use crate::rpc_lib::Xdr;
+                    use rpc_lib::Xdr;
                     impl #s_name {
                         #proc_code
                     }

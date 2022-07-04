@@ -6,12 +6,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-extern crate pest;
-extern crate proc_macro;
-extern crate quote;
-#[macro_use]
-extern crate pest_derive;
-
 use proc_macro::TokenStream;
 
 use std::fs::File;
@@ -62,7 +56,6 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
         ///
         /// Creates a connection to 127.0.0.1, makes an Rpc-Call and prints the result.
         /// ```
-        /// extern crate rpc_lib;
         /// use rpc_lib::include_rpcl;
         ///
         #[doc = #doc_macro_call]

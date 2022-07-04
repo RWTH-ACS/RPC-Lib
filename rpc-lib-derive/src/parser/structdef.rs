@@ -142,7 +142,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Struct {
 mod tests {
     use super::*;
     use crate::parser::RPCLParser;
-    use crate::pest::Parser;
+    use pest::Parser;
 
     use super::super::datatype::*;
     use super::super::declaration::*;
