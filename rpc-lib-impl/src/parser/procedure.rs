@@ -26,14 +26,12 @@ impl From<&Procedure> for TokenStream {
         let proc_name = format_ident!("{}", proc.name);
         let mut args = quote!();
         let mut serialization_code = quote!( let mut send_data = std::vec::Vec::new(); );
-        let mut i: u32 = 0;
-        for arg in &proc.args {
+        for (i, arg) in proc.args.iter().enumerate() {
             let arg_name = format_ident!("x{}", i);
             let arg_type: TokenStream = arg.into();
             args = quote!( #args #arg_name: &#arg_type,);
             serialization_code =
                 quote!( #serialization_code #arg_name.serialize(&mut send_data)?; );
-            i += 1;
         }
         let proc_num = TokenStream::from(&proc.num);
         if proc.return_type == DataType::Void {
