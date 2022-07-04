@@ -235,7 +235,7 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     // Parse Universal Address & Convert to Standard IP-Format
     let mut parse_index = 0;
     let universal_address_s = String::deserialize(&vec, &mut parse_index);
-    if universal_address_s.len() == 0 {
+    if universal_address_s.is_empty() {
         return Err(Error::new(
             ErrorKind::Other,
             "clnt_create: Rpc-Server not available",
