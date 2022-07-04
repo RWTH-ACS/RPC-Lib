@@ -28,7 +28,7 @@ use xdr_spec::Specification;
 #[grammar = "rpcl.pest"]
 pub struct RPCLParser;
 
-pub fn parse(x_file: &String, struct_name: &String) -> (TokenStream, u32, u32) {
+pub fn parse(x_file: &str, struct_name: &String) -> (TokenStream, u32, u32) {
     let parsed = RPCLParser::parse(Rule::file, x_file).expect("Syntax Error in .x-File");
     let s_name = quote::format_ident!("{}", struct_name);
 
