@@ -27,6 +27,7 @@
 //! let result = rpc.MY_RPC_PROCEDURE(&1, &2).expect("Rpc call failed");
 //! println!("MY_RPC_PROCEDURE returned: {}", result);
 //! ```
+#![forbid(unsafe_code)]
 
 mod rpc_struct;
 
