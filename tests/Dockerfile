@@ -18,7 +18,7 @@ RUN dnf install -y epel-release dnf-plugins-core && \
     dnf config-manager --set-enabled powertools && \
     dnf config-manager --set-enabled remi
 
-RUN dnf install -y make bash git gcc autoconf libtool automake rpcgen cargo \
+RUN dnf install -y make bash git gcc autoconf libtool automake rpcgen cargo rustfmt clippy \
                    ncurses-devel zlib-devel binutils-devel mesa-libGL-devel \
                    libvdpau-devel mesa-libEGL-devel openssl-devel rpcbind libtirpc-devel\
                    texinfo bison flex python3 which libibverbs libibverbs-devel \

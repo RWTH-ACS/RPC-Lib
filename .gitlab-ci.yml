@@ -20,6 +20,22 @@ prepare:centos8:docker-dev:
   tags:
     - docker
 
+test:fmt:
+  needs: ["prepare:centos8:docker-dev"]
+  image: ${DOCKER_IMAGE_DEV}:${DOCKER_TAG}
+  script:
+    - cargo fmt -- --check
+  tags:
+    - docker
+
+test:clippy:
+  needs: ["prepare:centos8:docker-dev"]
+  image: ${DOCKER_IMAGE_DEV}:${DOCKER_TAG}
+  script:
+    - cargo clippy -- -D warnings
+  tags:
+    - docker
+
 # Parser Unit-Tests
 test:unit:
   needs: ["prepare:centos8:docker-dev"]
