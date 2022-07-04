@@ -9,6 +9,7 @@
 #![warn(rust_2018_idioms)]
 
 use proc_macro::TokenStream;
+use syn::{parse_macro_input, DeriveInput};
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -17,6 +18,7 @@ use std::path::Path;
 use quote::{format_ident, quote};
 
 mod parser;
+mod xdr;
 
 #[proc_macro_attribute]
 pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
@@ -92,4 +94,10 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     code.into()
+}
+
+#[proc_macro_derive(Xdr)]
+pub fn xdr(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    xdr::expand_derive_xdr(input).into()
 }

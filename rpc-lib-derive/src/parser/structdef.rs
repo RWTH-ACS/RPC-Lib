@@ -24,38 +24,6 @@ pub struct Struct {
     pub fields: std::vec::Vec<Declaration>,
 }
 
-fn make_serialization_code(struct_body: &Struct) -> TokenStream {
-    let mut serialization_code = quote!();
-    for field in &struct_body.fields {
-        let field_name = format_ident!("{}", &field.name);
-        serialization_code = quote! {
-            #serialization_code self.#field_name.serialize(&mut writer)?;
-        };
-    }
-    quote! {
-        fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
-            #serialization_code
-            Ok(())
-        }
-    }
-}
-
-fn make_deserialization_code(struct_body: &Struct) -> TokenStream {
-    let mut deserialization_code = quote!();
-    for field in &struct_body.fields {
-        let field_name = format_ident!("{}", &field.name);
-        let field_type = TokenStream::from(&field.data_type);
-        deserialization_code = quote!( #deserialization_code #field_name: <#field_type> :: deserialize(bytes, parse_index), )
-    }
-    quote! {
-        fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
-            Self {
-                #deserialization_code
-            }
-        }
-    }
-}
-
 impl From<&Structdef> for TokenStream {
     fn from(struct_def: &Structdef) -> TokenStream {
         // Name
@@ -69,26 +37,11 @@ impl From<&Structdef> for TokenStream {
             let field_type = TokenStream::from(&field.data_type);
             struct_code = quote!( #struct_code #field_name: #field_type, );
         }
-        struct_code = quote! {
+        quote! {
+            #[derive(::rpc_lib_derive::Xdr)]
             struct #name {
                 #struct_code
             }
-        };
-
-        // (De)serialization
-        let serialization_func_code = make_serialization_code(struct_body);
-        let deserialization_func_code = make_deserialization_code(struct_body);
-        let ser_code = quote! {
-            impl Xdr for #name {
-                #serialization_func_code
-                #deserialization_func_code
-            }
-        };
-
-        // Struct
-        quote! {
-            #struct_code
-            #ser_code
         }
     }
 }
@@ -270,26 +223,11 @@ mod tests {
 
         // Code-gen
         let rust_code: TokenStream = quote! {
+            #[derive(::rpc_lib_derive::Xdr)]
             struct MyStruct_ {
                 x: i32,
                 f: f64,
                 t: MyType,
-            }
-            impl Xdr for MyStruct_ {
-                fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
-                    self.x.serialize(&mut writer)?;
-                    self.f.serialize(&mut writer)?;
-                    self.t.serialize(&mut writer)?;
-                    Ok(())
-                }
-
-                fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
-                    Self {
-                        x: <i32>::deserialize(bytes, parse_index),
-                        f: <f64>::deserialize(bytes, parse_index),
-                        t: <MyType>::deserialize(bytes, parse_index),
-                    }
-                }
             }
         }
         .into();

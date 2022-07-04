@@ -6,13 +6,16 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::io::{self, prelude::*};
+use std::io::prelude::*;
 use std::net::TcpStream;
 use std::vec::Vec;
+
+use rpc_lib_derive::Xdr;
 
 use super::xdr::*;
 use std::{fmt, io::*};
 
+#[derive(Xdr)]
 struct Rpcb {
     program: u32,
     version: u32,
@@ -21,28 +24,7 @@ struct Rpcb {
     owner: String,
 }
 
-impl Xdr for Rpcb {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        self.program.serialize(&mut writer)?;
-        self.version.serialize(&mut writer)?;
-        self.netid.serialize(&mut writer)?;
-        self.address.serialize(&mut writer)?;
-        self.owner.serialize(&mut writer)?;
-        Ok(())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Rpcb {
-        Rpcb {
-            program: u32::deserialize(bytes, parse_index),
-            version: u32::deserialize(bytes, parse_index),
-            netid: String::deserialize(bytes, parse_index),
-            address: String::deserialize(bytes, parse_index),
-            owner: String::deserialize(bytes, parse_index),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Xdr, Debug)]
 struct FragmentHeader {
     number: u32,
 }
@@ -70,43 +52,14 @@ impl FragmentHeader {
     }
 }
 
-impl Xdr for FragmentHeader {
-    fn serialize(&self, writer: impl Write) -> io::Result<()> {
-        self.number.serialize(writer)?;
-        Ok(())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
-        Self {
-            number: Xdr::deserialize(bytes, parse_index),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Xdr, Debug)]
 struct RpcCall {
     fragment_header: FragmentHeader,
     xid: u32,
     msg_type: u32, // (Call: 0, Reply: 1)
 }
 
-impl Xdr for RpcCall {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        self.fragment_header.serialize(&mut writer)?;
-        self.xid.serialize(&mut writer)?;
-        self.msg_type.serialize(&mut writer)?;
-        Ok(())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> RpcCall {
-        RpcCall {
-            fragment_header: FragmentHeader::deserialize(bytes, parse_index),
-            xid: u32::deserialize(bytes, parse_index),
-            msg_type: u32::deserialize(bytes, parse_index),
-        }
-    }
-}
-
+#[derive(Xdr)]
 struct RpcRequest {
     header: RpcCall,
     rpc_version: u32,
@@ -117,57 +70,13 @@ struct RpcRequest {
     verifier: u64,
 }
 
-impl Xdr for RpcRequest {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        self.header.serialize(&mut writer)?;
-        self.rpc_version.serialize(&mut writer)?;
-        self.program_num.serialize(&mut writer)?;
-        self.version_num.serialize(&mut writer)?;
-        self.proc_num.serialize(&mut writer)?;
-        self.credentials.serialize(&mut writer)?;
-        self.verifier.serialize(&mut writer)?;
-        Ok(())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> RpcRequest {
-        RpcRequest {
-            header: RpcCall::deserialize(bytes, parse_index),
-            rpc_version: u32::deserialize(bytes, parse_index),
-            program_num: u32::deserialize(bytes, parse_index),
-            version_num: u32::deserialize(bytes, parse_index),
-            proc_num: u32::deserialize(bytes, parse_index),
-            credentials: u64::deserialize(bytes, parse_index),
-            verifier: u64::deserialize(bytes, parse_index),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Xdr, Debug)]
 struct RpcReply {
     header: RpcCall,
     reply_state: u32,
     verifier: u64,
     accept_state: u32,
     // Serialized Data (Return Value of RPC-Procedure)
-}
-
-impl Xdr for RpcReply {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        self.header.serialize(&mut writer)?;
-        self.reply_state.serialize(&mut writer)?;
-        self.verifier.serialize(&mut writer)?;
-        self.accept_state.serialize(&mut writer)?;
-        Ok(())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> RpcReply {
-        RpcReply {
-            header: RpcCall::deserialize(bytes, parse_index),
-            reply_state: u32::deserialize(bytes, parse_index),
-            verifier: u64::deserialize(bytes, parse_index),
-            accept_state: u32::deserialize(bytes, parse_index),
-        }
-    }
 }
 
 #[derive(Debug)]
