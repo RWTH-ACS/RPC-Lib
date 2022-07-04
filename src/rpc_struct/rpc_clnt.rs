@@ -11,7 +11,6 @@ use std::net::TcpStream;
 use std::vec::Vec;
 
 use super::xdr::*;
-use std::convert::TryFrom;
 use std::{fmt, io::*};
 
 struct Rpcb {
@@ -45,28 +44,41 @@ impl Xdr for Rpcb {
 
 #[derive(Debug)]
 struct FragmentHeader {
-    last_fragment: bool,
-    length: u32,
+    number: u32,
+}
+
+impl FragmentHeader {
+    const LAST_FLAG: u32 = 1 << (u32::BITS - 1);
+
+    fn new(last: bool, len: u32) -> Self {
+        assert!(len <= u32::MAX >> 1);
+        let mut number = len;
+        if last {
+            number |= Self::LAST_FLAG; // insert
+        }
+        Self { number }
+    }
+
+    fn len(&self) -> u32 {
+        let mut len = self.number;
+        len &= !Self::LAST_FLAG; // remove
+        len
+    }
+
+    fn is_last(&self) -> bool {
+        (self.number & Self::LAST_FLAG) == Self::LAST_FLAG // contains
+    }
 }
 
 impl Xdr for FragmentHeader {
     fn serialize(&self, writer: impl Write) -> io::Result<()> {
-        if self.last_fragment {
-            (self.length + (1 << 31)).serialize(writer)?;
-        } else {
-            self.length.serialize(writer)?;
-        }
+        self.number.serialize(writer)?;
         Ok(())
     }
 
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> FragmentHeader {
-        let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
-        *parse_index += 4;
-        let num = u32::from_be_bytes(*x);
-        // First Bit: Last Fragment Flag, 31 following bits: Length
-        FragmentHeader {
-            last_fragment: num & 0x80000000u32 != 0,
-            length: num & 0x7FFFFFFFu32,
+    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
+        Self {
+            number: Xdr::deserialize(bytes, parse_index),
         }
     }
 }
@@ -262,10 +274,7 @@ fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &[u8]) ->
     // println!("[Rpc-Lib] Request Procedure: {}", procedure);
     let request = RpcRequest {
         header: RpcCall {
-            fragment_header: FragmentHeader {
-                last_fragment: true, // Only one Fragment
-                length: length as u32,
-            },
+            fragment_header: FragmentHeader::new(true, length as u32),
             xid: 123456, // Random but unique number
             msg_type: 0, // Type: Call
         },
@@ -314,14 +323,14 @@ fn receive_reply_packet(
     let (payload_length, last_fragment) = if header_len == 28 {
         let reply_header = RpcReply::deserialize(&header_buf, &mut index);
         (
-            reply_header.header.fragment_header.length as usize - header_len + 4,
-            reply_header.header.fragment_header.last_fragment,
+            reply_header.header.fragment_header.len() as usize - header_len + 4,
+            reply_header.header.fragment_header.is_last(),
         )
     } else {
         let fragment_header = FragmentHeader::deserialize(&header_buf, &mut index);
         (
-            fragment_header.length as usize - header_len + 4,
-            fragment_header.last_fragment,
+            fragment_header.len() as usize - header_len + 4,
+            fragment_header.is_last(),
         )
     };
 
