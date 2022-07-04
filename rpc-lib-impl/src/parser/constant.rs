@@ -64,16 +64,12 @@ impl From<pest::iterators::Pair<'_, Rule>> for Value {
     fn from(value: pest::iterators::Pair<'_, Rule>) -> Value {
         let token = value.into_inner().next().unwrap();
         match token.as_rule() {
-            Rule::constant => {
-                return Value::Numeric {
-                    val: parse_num(token),
-                }
-            }
-            Rule::identifier => {
-                return Value::Named {
-                    name: token.as_str().to_string(),
-                }
-            }
+            Rule::constant => Value::Numeric {
+                val: parse_num(token),
+            },
+            Rule::identifier => Value::Named {
+                name: token.as_str().to_string(),
+            },
             _ => panic!("Syntax Error"),
         }
     }

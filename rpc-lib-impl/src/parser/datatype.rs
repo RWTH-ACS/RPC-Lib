@@ -76,35 +76,27 @@ impl From<&DataType> for TokenStream {
 
 fn parse_primitive(primitive_type: pest::iterators::Pair<'_, Rule>) -> DataType {
     match primitive_type.as_str() {
-        "unsigned int" => {
-            return DataType::Integer {
-                length: 32,
-                signed: false,
-            }
-        }
-        "int" => {
-            return DataType::Integer {
-                length: 32,
-                signed: true,
-            }
-        }
-        "unsigned hyper" => {
-            return DataType::Integer {
-                length: 64,
-                signed: false,
-            }
-        }
-        "hyper" => {
-            return DataType::Integer {
-                length: 64,
-                signed: true,
-            }
-        }
-        "float" => return DataType::Float { length: 32 },
-        "double" => return DataType::Float { length: 64 },
-        "quadruple" => return DataType::Float { length: 128 },
-        "bool" => return DataType::Boolean,
-        "string" | "string<>" => return DataType::String,
+        "unsigned int" => DataType::Integer {
+            length: 32,
+            signed: false,
+        },
+        "int" => DataType::Integer {
+            length: 32,
+            signed: true,
+        },
+        "unsigned hyper" => DataType::Integer {
+            length: 64,
+            signed: false,
+        },
+        "hyper" => DataType::Integer {
+            length: 64,
+            signed: true,
+        },
+        "float" => DataType::Float { length: 32 },
+        "double" => DataType::Float { length: 64 },
+        "quadruple" => DataType::Float { length: 128 },
+        "bool" => DataType::Boolean,
+        "string" | "string<>" => DataType::String,
         _ => panic!("Syntax Error"),
     }
 }
@@ -114,32 +106,20 @@ impl From<pest::iterators::Pair<'_, Rule>> for DataType {
         // type_specifier > inner_rule (e.g. primitve_type, enum_type_spec, ...)
         let inner_rule = type_specifier.into_inner().next().unwrap();
         match inner_rule.as_rule() {
-            Rule::primitive_type => {
-                return parse_primitive(inner_rule);
-            }
-            Rule::void => {
-                return DataType::Void;
-            }
-            Rule::enum_type_spec => {
-                return DataType::Enum {
-                    def: parse_enum_type_spec(inner_rule),
-                };
-            }
-            Rule::union_type_spec => {
-                return DataType::Union {
-                    def: parse_union_type_spec(inner_rule),
-                }
-            }
-            Rule::struct_type_spec => {
-                return DataType::Struct {
-                    def: parse_struct_type_spec(inner_rule),
-                }
-            }
-            Rule::identifier => {
-                return DataType::TypeDef {
-                    name: inner_rule.as_str().to_string(),
-                }
-            }
+            Rule::primitive_type => parse_primitive(inner_rule),
+            Rule::void => DataType::Void,
+            Rule::enum_type_spec => DataType::Enum {
+                def: parse_enum_type_spec(inner_rule),
+            },
+            Rule::union_type_spec => DataType::Union {
+                def: parse_union_type_spec(inner_rule),
+            },
+            Rule::struct_type_spec => DataType::Struct {
+                def: parse_struct_type_spec(inner_rule),
+            },
+            Rule::identifier => DataType::TypeDef {
+                name: inner_rule.as_str().to_string(),
+            },
             _ => panic!("Syntax Error"),
         }
     }
