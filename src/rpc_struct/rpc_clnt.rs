@@ -217,8 +217,8 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     };
 
     let rpcb = Rpcb {
-        program: program,
-        version: version,
+        program,
+        version,
         netid: String::from("tcp"),
         address: String::from(address) + ".0.111", // Port of Portmap Service in universal address format
         owner: String::from("rpclib"),
@@ -247,9 +247,9 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     let stream = TcpStream::connect(ip.to_string())?;
 
     Ok(RpcClient {
-        program: program,
-        version: version,
-        stream: stream,
+        program,
+        version,
+        stream,
     })
 }
 
