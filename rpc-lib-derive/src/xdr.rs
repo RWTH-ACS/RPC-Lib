@@ -34,7 +34,7 @@ pub fn expand_struct(struct_ident: Ident, data_struct: DataStruct) -> TokenStrea
         .map(|field| {
             let ident = &field.ident;
             quote! {
-                #ident: Xdr::deserialize(bytes, parse_index),
+                #ident: Xdr::deserialize(&mut reader)?,
             }
         })
         .collect::<TokenStream>();
@@ -46,10 +46,10 @@ pub fn expand_struct(struct_ident: Ident, data_struct: DataStruct) -> TokenStrea
                 Ok(())
             }
 
-            fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
-                Self {
+            fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
+                Ok(Self {
                     #deserializations
-                }
+                })
             }
         }
     }
@@ -79,11 +79,11 @@ mod tests {
                     Ok(())
                 }
 
-                fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
-                    Self {
-                        bar: Xdr::deserialize(bytes, parse_index),
-                        baz: Xdr::deserialize(bytes, parse_index),
-                    }
+                fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
+                    Ok(Self {
+                        bar: Xdr::deserialize(&mut reader)?,
+                        baz: Xdr::deserialize(&mut reader)?,
+                    })
                 }
             }
         };

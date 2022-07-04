@@ -46,8 +46,7 @@ impl From<&Procedure> for TokenStream {
                 let recv = rpc_lib::rpc_call(&mut self.client, #proc_num as u32, &send_data)?;
 
                 // Parse ReplyHeader
-                let mut parse_index = 0;
-                Ok(<#return_type>::deserialize(&recv, &mut parse_index))
+                <#return_type>::deserialize(&recv[..])
             }}
         }
     }
@@ -110,8 +109,7 @@ mod tests {
                 x0.serialize(&mut send_data)?;
                 x1.serialize(&mut send_data)?;
                 let recv = rpc_lib::rpc_call(&mut self.client, 1i64 as u32, &send_data)?;
-                let mut parse_index = 0;
-                Ok(<f32>::deserialize(&recv, &mut parse_index))
+                <f32>::deserialize(&recv[..])
             }
         };
         let generated_code: TokenStream = (&proc_generated).into();

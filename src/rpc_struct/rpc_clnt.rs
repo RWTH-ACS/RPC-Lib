@@ -151,8 +151,7 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     let vec = rpc_call(&mut client, 3, &send)?;
 
     // Parse Universal Address & Convert to Standard IP-Format
-    let mut parse_index = 0;
-    let universal_address_s = String::deserialize(&vec, &mut parse_index);
+    let universal_address_s = String::deserialize(&vec[..])?;
     if universal_address_s.is_empty() {
         return Err(Error::new(
             ErrorKind::Other,
@@ -228,15 +227,14 @@ fn receive_reply_packet(
     // Receive Header
     let mut header_buf = vec![0; header_len];
     client.stream.read_exact(&mut header_buf)?;
-    let mut index: usize = 0;
     let (payload_length, last_fragment) = if header_len == 28 {
-        let reply_header = RpcReply::deserialize(&header_buf, &mut index);
+        let reply_header = RpcReply::deserialize(&header_buf[..])?;
         (
             reply_header.header.fragment_header.len() as usize - header_len + 4,
             reply_header.header.fragment_header.is_last(),
         )
     } else {
-        let fragment_header = FragmentHeader::deserialize(&header_buf, &mut index);
+        let fragment_header = FragmentHeader::deserialize(&header_buf[..])?;
         (
             fragment_header.len() as usize - header_len + 4,
             fragment_header.is_last(),

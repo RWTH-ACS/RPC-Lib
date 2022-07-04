@@ -6,18 +6,19 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::convert::{TryFrom, TryInto};
-use std::io::{self, Write};
+use std::convert::TryInto;
+use std::io::{self, Read, Write};
+use std::mem;
 use std::vec::Vec;
 
 /// Types with the `Xdr`-Trait can be serialised and deserialised as described in [`RFC 4506`]
 ///
 /// [`RFC 4506`]: <https://datatracker.ietf.org/doc/html/rfc4506>
-pub trait Xdr {
+pub trait Xdr: Sized {
     // Serializes data and converts to network byte order
     fn serialize(&self, writer: impl Write) -> io::Result<()>;
     // Reverse Operation
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self;
+    fn deserialize(reader: impl Read) -> io::Result<Self>;
 }
 
 fn padding(len: usize) -> usize {
@@ -31,10 +32,10 @@ impl<const LEN: usize> Xdr for [u8; LEN] {
         writer.write_all(&[0u8; 3][..padding(LEN)])
     }
 
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
-        let ret = bytes[..LEN].try_into().unwrap();
-        *parse_index += LEN + padding(LEN);
-        ret
+    fn deserialize(mut reader: impl Read) -> io::Result<Self> {
+        let mut this = [0; LEN];
+        reader.read_exact(&mut this)?;
+        Ok(this)
     }
 }
 
@@ -46,11 +47,11 @@ impl Xdr for Vec<u8> {
         writer.write_all(&[0u8; 3][..padding(self.len())])
     }
 
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
-        let len = u32::deserialize(bytes, parse_index) as usize;
-        let ret = bytes[..len].into();
-        *parse_index += len + padding(len);
-        ret
+    fn deserialize(mut reader: impl Read) -> io::Result<Self> {
+        let len = u32::deserialize(&mut reader)? as usize;
+        let mut this = vec![0; len];
+        reader.read_exact(&mut this)?;
+        Ok(this)
     }
 }
 
@@ -63,15 +64,12 @@ impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
         Ok(())
     }
 
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> [T; LEN] {
+    fn deserialize(mut reader: impl Read) -> io::Result<Self> {
         let mut vec = Vec::with_capacity(LEN);
         for _ in 0..LEN {
-            vec.push(T::deserialize(bytes, parse_index));
+            vec.push(T::deserialize(&mut reader)?);
         }
-        match vec.try_into() {
-            Ok(array) => array,
-            Err(_) => unreachable!(),
-        }
+        vec.try_into().map_err(|_| unreachable!())
     }
 }
 
@@ -85,103 +83,49 @@ impl<T: Xdr> Xdr for Vec<T> {
         Ok(())
     }
 
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Vec<T> {
-        let len = u32::deserialize(bytes, parse_index).try_into().unwrap();
-        let mut vec = Vec::with_capacity(len);
+    fn deserialize(mut reader: impl Read) -> io::Result<Self> {
+        let len = u32::deserialize(&mut reader)? as usize;
+        let mut this = Vec::with_capacity(len);
         for _ in 0..len {
-            vec.push(T::deserialize(bytes, parse_index));
+            this.push(T::deserialize(&mut reader)?);
         }
-        vec
-    }
-}
-
-impl Xdr for i32 {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        writer.write_all(&self.to_be_bytes())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> i32 {
-        let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
-        *parse_index += 4;
-        i32::from_be_bytes(*x)
-    }
-}
-
-impl Xdr for u32 {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        writer.write_all(&self.to_be_bytes())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> u32 {
-        let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
-        *parse_index += 4;
-        u32::from_be_bytes(*x)
-    }
-}
-
-impl Xdr for i64 {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        writer.write_all(&self.to_be_bytes())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> i64 {
-        let x = <&[u8; 8]>::try_from(&bytes[*parse_index..*parse_index + 8]).unwrap();
-        *parse_index += 8;
-        i64::from_be_bytes(*x)
-    }
-}
-
-impl Xdr for u64 {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        writer.write_all(&self.to_be_bytes())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> u64 {
-        let x = <&[u8; 8]>::try_from(&bytes[*parse_index..*parse_index + 8]).unwrap();
-        *parse_index += 8;
-        u64::from_be_bytes(*x)
+        Ok(this)
     }
 }
 
 impl Xdr for String {
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
+        assert!(self.is_ascii());
         (self.len() as u32).serialize(&mut writer)?;
         writer.write_all(self.as_bytes())?;
-        // Alignment on 4 bytes
-        for _i in 0..padding(self.len()) {
-            writer.write_all(&[0])?;
+        writer.write_all(&[0u8; 3][..padding(self.len())])
+    }
+
+    fn deserialize(reader: impl Read) -> io::Result<Self> {
+        let vec = Vec::<u8>::deserialize(reader)?;
+        Ok(Self::from_utf8(vec).unwrap())
+    }
+}
+
+macro_rules! impl_xdr_be_bytes {
+    ($Ty:ty) => {
+        impl Xdr for $Ty {
+            fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
+                writer.write_all(&self.to_be_bytes())
+            }
+
+            fn deserialize(mut reader: impl Read) -> io::Result<Self> {
+                let mut buf = [0; mem::size_of::<Self>()];
+                reader.read_exact(&mut buf)?;
+                Ok(Self::from_be_bytes(buf))
+            }
         }
-        Ok(())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> String {
-        let len: usize = u32::deserialize(bytes, parse_index).try_into().unwrap();
-        let s = String::from_utf8(bytes[*parse_index..*parse_index + len].to_vec()).unwrap();
-        *parse_index += len + padding(len);
-        s
-    }
+    };
 }
 
-impl Xdr for f32 {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        writer.write_all(&self.to_be_bytes())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> f32 {
-        let x = <&[u8; 4]>::try_from(&bytes[*parse_index..*parse_index + 4]).unwrap();
-        *parse_index += 4;
-        f32::from_be_bytes(*x)
-    }
-}
-
-impl Xdr for f64 {
-    fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
-        writer.write_all(&self.to_be_bytes())
-    }
-
-    fn deserialize(bytes: &[u8], parse_index: &mut usize) -> f64 {
-        let x = <&[u8; 8]>::try_from(&bytes[*parse_index..*parse_index + 8]).unwrap();
-        *parse_index += 8;
-        f64::from_be_bytes(*x)
-    }
-}
+impl_xdr_be_bytes!(u32);
+impl_xdr_be_bytes!(u64);
+impl_xdr_be_bytes!(i32);
+impl_xdr_be_bytes!(i64);
+impl_xdr_be_bytes!(f32);
+impl_xdr_be_bytes!(f64);

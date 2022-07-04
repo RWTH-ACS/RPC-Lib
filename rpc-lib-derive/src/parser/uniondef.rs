@@ -49,7 +49,7 @@ fn make_deserialize_function_code(union: &Union) -> TokenStream {
                 let case_ident = format_ident!("Case{}", number as u32);
                 if data_decl.decl_type != DeclarationType::VoidDecl {
                     let decl: TokenStream = data_decl.into();
-                    match_code = quote!( #match_code #number => Self :: #case_ident { #decl :: deserialize(bytes, parse_index) }, );
+                    match_code = quote!( #match_code #number => Self :: #case_ident { #decl :: deserialize(&mut reader)? }, );
                 } else {
                     match_code = quote!( #match_code #number => Self :: #case_ident, );
                 }
@@ -65,12 +65,12 @@ fn make_deserialize_function_code(union: &Union) -> TokenStream {
 
     // Construct Function:
     quote! {
-        fn deserialize(bytes: &[u8], parse_index: &mut usize) -> Self {
-            let err_code = i32::deserialize(bytes, parse_index);
-            match err_code {
+        fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
+            let err_code = i32::deserialize(&mut reader)?;
+            Ok(match err_code {
                 #match_code
                 _ => panic!("Unknown field of discriminated union with Field-Value {}", err_code),
-            }
+            })
         }
     }
 }
@@ -388,14 +388,14 @@ mod tests {
         let rust_code: TokenStream = quote! {
             enum MyUnion2 { Case0 { result: i32 }, Case2 { result: f32 }, CaseDefault, }
             impl Xdr for MyUnion2 {
-                fn deserialize(bytes: &[u8] , parse_index: &mut usize) -> Self {
-                    let err_code = i32::deserialize(bytes, parse_index);
-                    match err_code {
-                        0i32 => Self::Case0 { result: i32::deserialize(bytes, parse_index) },
-                        2i32 => Self::Case2 { result: f32::deserialize(bytes, parse_index) },
+                fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
+                    let err_code = i32::deserialize(&mut reader)?;
+                    Ok(match err_code {
+                        0i32 => Self::Case0 { result: i32::deserialize(&mut reader)? },
+                        2i32 => Self::Case2 { result: f32::deserialize(&mut reader)? },
                         _ => Self::CaseDefault,
                         _ => panic!("Unknown field of discriminated union with Field-Value {}", err_code),
-                    }
+                    })
                 }
                 fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
                     match self {
