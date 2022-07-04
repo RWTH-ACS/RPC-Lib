@@ -179,7 +179,7 @@ pub struct RpcClient {
 
 impl UniversalAddress {
     // Format: xxx.xxx.xxx.xxx.xxx.xxx
-    fn from_string(s: &String) -> UniversalAddress {
+    fn from_string(s: &str) -> UniversalAddress {
         let splitted = s.split('.').collect::<Vec<&str>>();
         let mut ret = UniversalAddress {
             ip: [0, 0, 0, 0],
