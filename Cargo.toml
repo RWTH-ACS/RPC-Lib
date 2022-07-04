@@ -4,4 +4,4 @@ version = "0.1.0"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-rpc-lib-impl = { version = "0.1.0", path = "rpc-lib-impl" }
+rpc-lib-derive = { version = "0.1.0", path = "rpc-lib-derive" }

@@ -30,7 +30,7 @@
 //!     println!("MY_RPC_PROCEDURE returned: {}", result);
 //! }
 //! ```
-extern crate rpc_lib_impl;
+extern crate rpc_lib_derive;
 
 mod rpc_struct;
 
@@ -43,7 +43,7 @@ mod rpc_struct;
 /// #[include_rpcl("my_file.x")]
 /// struct MyStruct;
 /// ```
-pub use rpc_lib_impl::include_rpcl;
+pub use rpc_lib_derive::include_rpcl;
 
 pub use rpc_struct::clnt_create;
 pub use rpc_struct::rpc_call;

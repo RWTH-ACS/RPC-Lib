@@ -1,5 +1,5 @@
 [package]
-name = "rpc-lib-impl"
+name = "rpc-lib-derive"
 version = "0.1.0"
 edition = "2018"
 
