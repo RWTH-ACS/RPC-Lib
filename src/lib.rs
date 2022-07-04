@@ -28,6 +28,7 @@
 //! println!("MY_RPC_PROCEDURE returned: {}", result);
 //! ```
 #![forbid(unsafe_code)]
+#![warn(rust_2018_idioms)]
 
 mod rpc_struct;
 
