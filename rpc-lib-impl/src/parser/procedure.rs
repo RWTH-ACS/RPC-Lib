@@ -33,7 +33,7 @@ impl From<&Procedure> for TokenStream {
             args = quote!( #args #arg_name: &#arg_type,);
             serialization_code =
                 quote!( #serialization_code #arg_name.serialize(&mut send_data)?; );
-            i = i + 1;
+            i += 1;
         }
         let proc_num = TokenStream::from(&proc.num);
         if proc.return_type == DataType::Void {
