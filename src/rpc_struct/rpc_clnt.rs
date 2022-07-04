@@ -197,11 +197,11 @@ impl UniversalAddress {
     fn to_string(&self) -> String {
         let string_repr = std::format!(
             "{}.{}.{}.{}:{}",
-            self.ip[0].to_string(),
-            self.ip[1].to_string(),
-            self.ip[2].to_string(),
-            self.ip[3].to_string(),
-            self.port.to_string(),
+            self.ip[0],
+            self.ip[1],
+            self.ip[2],
+            self.ip[3],
+            self.port,
         );
         string_repr
     }
