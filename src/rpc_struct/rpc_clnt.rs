@@ -12,7 +12,7 @@ use std::vec::Vec;
 
 use super::xdr::*;
 use std::convert::TryFrom;
-use std::io::*;
+use std::{fmt, io::*};
 
 struct Rpcb {
     program: u32,
@@ -192,18 +192,15 @@ impl UniversalAddress {
         ret.port += splitted[5].parse::<u16>().unwrap();
         ret
     }
+}
 
-    // Format: xxx.xxx.xxx.xxx:xxxxx
-    fn to_string(&self) -> String {
-        let string_repr = std::format!(
+impl fmt::Display for UniversalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "{}.{}.{}.{}:{}",
-            self.ip[0],
-            self.ip[1],
-            self.ip[2],
-            self.ip[3],
-            self.port,
-        );
-        string_repr
+            self.ip[0], self.ip[1], self.ip[2], self.ip[3], self.port,
+        )
     }
 }
 
