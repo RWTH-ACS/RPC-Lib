@@ -24,11 +24,9 @@
 //! #[include_rpcl("my_rpcl_file.x")]
 //! struct RPCStruct;
 //!
-//! fn main() {
-//!     let mut rpc = RPCStruct::new("127.0.0.1").expect("Can't connect to server");
-//!     let result = rpc.MY_RPC_PROCEDURE(&1, &2).expect("Rpc call failed");
-//!     println!("MY_RPC_PROCEDURE returned: {}", result);
-//! }
+//! let mut rpc = RPCStruct::new("127.0.0.1").expect("Can't connect to server");
+//! let result = rpc.MY_RPC_PROCEDURE(&1, &2).expect("Rpc call failed");
+//! println!("MY_RPC_PROCEDURE returned: {}", result);
 //! ```
 extern crate rpc_lib_derive;
 
