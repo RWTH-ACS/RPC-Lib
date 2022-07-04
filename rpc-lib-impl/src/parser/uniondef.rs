@@ -207,7 +207,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Union {
                             }
                         }
                         DataType::Boolean => DiscriminantType::Boolean,
-                        DataType::TypeDef { name } => DiscriminantType::Enum { name: name },
+                        DataType::TypeDef { name } => DiscriminantType::Enum { name },
                         _ => panic!("Invalid Discriminant-Type in Union"),
                     };
                 }
