@@ -139,7 +139,7 @@ pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> Result<RpcClient> 
     };
 
     // Proc 3: GETADDR
-    let universal_address_s: String = rpc_call(&mut client, 3, &rpcb)?;
+    let universal_address_s: String = client.call(3, &rpcb)?;
 
     // Convert Universal Address to Standard IP-Format
     if universal_address_s.is_empty() {
@@ -160,13 +160,15 @@ pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> Result<RpcClient> 
     })
 }
 
-pub fn rpc_call<T: XdrDeserialize>(
-    client: &mut RpcClient,
-    procedure: u32,
-    send: impl XdrSerialize,
-) -> Result<T> {
-    send_rpc_request(client, procedure, send)?;
-    receive_rpc_reply(&mut client.stream)
+impl RpcClient {
+    pub fn call<T: XdrDeserialize>(
+        &mut self,
+        procedure: u32,
+        args: impl XdrSerialize,
+    ) -> Result<T> {
+        send_rpc_request(self, procedure, args)?;
+        receive_rpc_reply(&mut self.stream)
+    }
 }
 
 fn send_rpc_request(

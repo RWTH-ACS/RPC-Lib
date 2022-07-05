@@ -44,7 +44,6 @@ mod rpc_struct;
 pub use rpc_lib_derive::include_rpcl;
 
 pub use crate::rpc_struct::clnt_create;
-pub use crate::rpc_struct::rpc_call;
 pub use crate::rpc_struct::RpcClient;
 
 pub use crate::rpc_struct::xdr::*;
