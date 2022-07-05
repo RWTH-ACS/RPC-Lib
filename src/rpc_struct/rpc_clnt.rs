@@ -8,7 +8,6 @@
 
 use std::net::{AddrParseError, IpAddr, TcpStream};
 use std::str::FromStr;
-use std::vec::Vec;
 use std::{io::prelude::*, net::SocketAddr};
 
 use rpc_lib_derive::{XdrDeserialize, XdrSerialize};
@@ -46,10 +45,6 @@ impl FragmentHeader {
         let mut len = self.number;
         len &= !Self::LAST_FLAG; // remove
         len
-    }
-
-    fn is_last(&self) -> bool {
-        (self.number & Self::LAST_FLAG) == Self::LAST_FLAG // contains
     }
 }
 
@@ -204,40 +199,37 @@ fn send_rpc_request(
     Ok(())
 }
 
-fn receive_rpc_reply<T: XdrDeserialize>(mut reader: impl Read) -> Result<T> {
+struct FragmentReader<R> {
+    inner: R,
+    nleft: u32,
+}
+
+impl<R: Read> FragmentReader<R> {
+    fn new(inner: R) -> Self {
+        Self { inner, nleft: 0 }
+    }
+}
+
+impl<R: Read> Read for FragmentReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        if self.nleft == 0 {
+            let fragment_header = FragmentHeader::deserialize(&mut self.inner)?;
+            self.nleft = fragment_header.len();
+        }
+
+        let nread = self.inner.by_ref().take(self.nleft.into()).read(buf)?;
+        self.nleft -= nread as u32;
+        Ok(nread)
+    }
+}
+
+fn receive_rpc_reply<T: XdrDeserialize>(reader: impl Read) -> Result<T> {
     // Packet-length: If the reply is split into multiple fragments,
     // there will only be the fragment-header
     //
     // FRAGMENT-HEADER | REPLY-HEADER | PAYLOAD
     //        4        |      24      |
-
-    let fragment_header = FragmentHeader::deserialize(&mut reader)?;
-    let reply_header = RpcReply::deserialize(&mut reader)?;
-
-    if fragment_header.is_last() {
-        XdrDeserialize::deserialize(&mut reader)
-    } else {
-        let payload_len = fragment_header.len() as usize - reply_header.len();
-        let mut vec = Vec::with_capacity(payload_len);
-
-        (&mut reader)
-            .take(payload_len as u64)
-            .read_to_end(&mut vec)?;
-
-        loop {
-            // Receive following fragments
-            let fragment_header = FragmentHeader::deserialize(&mut reader)?;
-
-            // Receive Reply-Data
-            (&mut reader)
-                .take(fragment_header.len().into())
-                .read_to_end(&mut vec)?;
-
-            if fragment_header.is_last() {
-                break;
-            }
-        }
-
-        XdrDeserialize::deserialize(&vec[..])
-    }
+    let mut reader = FragmentReader::new(reader);
+    RpcReply::deserialize(&mut reader)?;
+    XdrDeserialize::deserialize(&mut reader)
 }
