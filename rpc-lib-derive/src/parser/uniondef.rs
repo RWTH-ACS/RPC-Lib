@@ -181,6 +181,7 @@ impl From<&Uniondef> for TokenStream {
 
         // Paste together
         quote! {
+            #[derive(Debug)]
             enum #name {
                 #union_body
                 CaseDefault,
@@ -425,6 +426,7 @@ mod tests {
 
         // Code-gen
         let rust_code: TokenStream = quote! {
+            #[derive(Debug)]
             enum MyUnion2 { Case0 { result: i32 }, Case2 { result: f32 }, CaseDefault, }
             impl XdrDeserialize for MyUnion2 {
                 fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
