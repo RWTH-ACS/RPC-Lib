@@ -31,6 +31,12 @@ fn padding(len: usize) -> usize {
     (4 - len % 4) % 4
 }
 
+impl XdrSerialize for () {
+    fn serialize(&self, _writer: impl Write) -> io::Result<()> {
+        Ok(())
+    }
+}
+
 impl<T: XdrSerialize + ?Sized> XdrSerialize for &T {
     #[inline]
     fn serialize(&self, writer: impl Write) -> io::Result<()> {
