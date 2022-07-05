@@ -143,12 +143,7 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     };
 
     // Proc 3: GETADDR
-    let send = {
-        let mut send = Vec::new();
-        rpcb.serialize(&mut send)?;
-        send
-    };
-    let vec = rpc_call(&mut client, 3, &send)?;
+    let vec = rpc_call(&mut client, 3, &rpcb)?;
 
     // Parse Universal Address & Convert to Standard IP-Format
     let universal_address_s = String::deserialize(&vec[..])?;
@@ -170,14 +165,24 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     })
 }
 
-pub fn rpc_call(client: &mut RpcClient, procedure: u32, send: &[u8]) -> Result<Vec<u8>> {
+pub fn rpc_call(
+    client: &mut RpcClient,
+    procedure: u32,
+    send: impl XdrSerialize,
+) -> Result<Vec<u8>> {
     send_rpc_request(client, procedure, send)?;
     receive_rpc_reply(client)
 }
 
-fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &[u8]) -> Result<()> {
+fn send_rpc_request(
+    client: &mut RpcClient,
+    procedure: u32,
+    send_data: impl XdrSerialize,
+) -> Result<()> {
     const REQUEST_HEADER_LEN: usize = 40;
-    let length = REQUEST_HEADER_LEN + send_data.len();
+    let mut buf = Vec::new();
+    send_data.serialize(&mut buf)?;
+    let length = REQUEST_HEADER_LEN + buf.len();
 
     // println!("[Rpc-Lib] Request Procedure: {}", procedure);
     let request = RpcRequest {
@@ -196,7 +201,7 @@ fn send_rpc_request(client: &mut RpcClient, procedure: u32, send_data: &[u8]) ->
 
     // Send Request
     request.serialize(&mut client.stream)?;
-    client.stream.write_all(&*send_data)?;
+    client.stream.write_all(&buf)?;
     Ok(())
 }
 

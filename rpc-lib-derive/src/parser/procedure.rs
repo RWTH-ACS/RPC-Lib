@@ -25,26 +25,69 @@ impl From<&Procedure> for TokenStream {
     fn from(proc: &Procedure) -> TokenStream {
         let proc_name = format_ident!("{}", proc.name);
 
-        let mut args = quote!();
-        let mut serialization_code = quote!( let mut send_data = std::vec::Vec::new(); );
-        for (i, arg) in proc.args.iter().enumerate() {
-            let arg_name = format_ident!("x{}", i);
-            let arg_type: TokenStream = arg.into();
-            args = quote!( #args #arg_name: &#arg_type,);
-            serialization_code =
-                quote!( #serialization_code #arg_name.serialize(&mut send_data)?; );
-        }
+        let arg_defs = proc
+            .args
+            .iter()
+            .enumerate()
+            .map(|(i, ty)| {
+                let ty = TokenStream::from(ty);
+                let ident = format_ident!("x{}", i);
+                quote! {
+                    #ident: &#ty,
+                }
+            })
+            .collect::<TokenStream>();
+
+        let arg = if !proc.args.is_empty() {
+            let field_defs = proc
+                .args
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| {
+                    let ty = TokenStream::from(ty);
+                    let ident = format_ident!("x{}", i);
+                    quote! {
+                        #ident: &'a #ty,
+                    }
+                })
+                .collect::<TokenStream>();
+
+            let field_idents = proc
+                .args
+                .iter()
+                .enumerate()
+                .map(|(i, _ty)| {
+                    let ident = format_ident!("x{}", i);
+                    quote! {
+                        #ident,
+                    }
+                })
+                .collect::<TokenStream>();
+
+            quote! {
+                {
+                    #[derive(::rpc_lib_derive::XdrSerialize)]
+                    struct Args<'a> {
+                        #field_defs
+                    }
+
+                    &Args {
+                        #field_idents
+                    }
+                }
+            }
+        } else {
+            quote!(())
+        };
+
         let proc_num = TokenStream::from(&proc.num);
         if proc.return_type == DataType::Void {
-            quote! { fn #proc_name (&self, #args) { }}
+            quote! { fn #proc_name(&self, #arg_defs) {}}
         } else {
             let return_type = TokenStream::from(&proc.return_type);
-            quote! { fn #proc_name (&mut self, #args) -> std::io::Result<#return_type> {
-                // Parameter-Seralization
-                #serialization_code
-
+            quote! { fn #proc_name(&mut self, #arg_defs) -> std::io::Result<#return_type> {
                 // Call
-                let recv = rpc_lib::rpc_call(&mut self.client, #proc_num as u32, &send_data)?;
+                let recv = rpc_lib::rpc_call(&mut self.client, #proc_num as u32, #arg)?;
 
                 // Parse ReplyHeader
                 <#return_type>::deserialize(&recv[..])
@@ -106,10 +149,18 @@ mod tests {
         // Code-gen
         let rust_code: TokenStream = quote! {
             fn PROC_NAME(&mut self, x0: &i32, x1: &f32, ) -> std::io::Result<f32> {
-                let mut send_data = std::vec::Vec::new();
-                x0.serialize(&mut send_data)?;
-                x1.serialize(&mut send_data)?;
-                let recv = rpc_lib::rpc_call(&mut self.client, 1i64 as u32, &send_data)?;
+                let recv = rpc_lib::rpc_call(&mut self.client, 1i64 as u32, {
+                    #[derive(::rpc_lib_derive::XdrSerialize)]
+                    struct Args<'a> {
+                        x0: &'a i32,
+                        x1: &'a f32,
+                    }
+
+                    &Args {
+                        x0,
+                        x1,
+                    }
+                })?;
                 <f32>::deserialize(&recv[..])
             }
         };
