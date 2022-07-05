@@ -181,9 +181,7 @@ fn send_rpc_request(
     send_data: impl XdrSerialize,
 ) -> Result<()> {
     const REQUEST_HEADER_LEN: usize = 40;
-    let mut buf = Vec::new();
-    send_data.serialize(&mut buf)?;
-    let length = REQUEST_HEADER_LEN + buf.len();
+    let length = REQUEST_HEADER_LEN + send_data.len();
 
     // println!("[Rpc-Lib] Request Procedure: {}", procedure);
     let request = RpcRequest {
@@ -202,7 +200,7 @@ fn send_rpc_request(
 
     // Send Request
     request.serialize(&mut client.stream)?;
-    client.stream.write_all(&buf)?;
+    send_data.serialize(&mut client.stream)?;
     Ok(())
 }
 
