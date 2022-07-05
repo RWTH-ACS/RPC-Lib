@@ -55,7 +55,6 @@ impl FragmentHeader {
 
 #[derive(XdrSerialize, XdrDeserialize, Debug)]
 struct RpcCall {
-    fragment_header: FragmentHeader,
     xid: u32,
     msg_type: u32, // (Call: 0, Reply: 1)
 }
@@ -182,11 +181,11 @@ fn send_rpc_request(
 ) -> Result<()> {
     const REQUEST_HEADER_LEN: usize = 40;
     let length = REQUEST_HEADER_LEN + send_data.len();
+    let fragment_header = FragmentHeader::new(true, length as u32);
 
     // println!("[Rpc-Lib] Request Procedure: {}", procedure);
     let request = RpcRequest {
         header: RpcCall {
-            fragment_header: FragmentHeader::new(true, length as u32),
             xid: 123456, // Random but unique number
             msg_type: 0, // Type: Call
         },
@@ -199,6 +198,7 @@ fn send_rpc_request(
     };
 
     // Send Request
+    fragment_header.serialize(&mut client.stream)?;
     request.serialize(&mut client.stream)?;
     send_data.serialize(&mut client.stream)?;
     Ok(())
@@ -210,14 +210,14 @@ fn receive_rpc_reply<T: XdrDeserialize>(mut reader: impl Read) -> Result<T> {
     //
     // FRAGMENT-HEADER | REPLY-HEADER | PAYLOAD
     //        4        |      24      |
-    const REPLY_HEADER_LEN: usize = 24;
 
+    let fragment_header = FragmentHeader::deserialize(&mut reader)?;
     let reply_header = RpcReply::deserialize(&mut reader)?;
 
-    if reply_header.header.fragment_header.is_last() {
+    if fragment_header.is_last() {
         XdrDeserialize::deserialize(&mut reader)
     } else {
-        let payload_len = reply_header.header.fragment_header.len() as usize - REPLY_HEADER_LEN;
+        let payload_len = fragment_header.len() as usize - reply_header.len();
         let mut vec = Vec::with_capacity(payload_len);
 
         (&mut reader)
