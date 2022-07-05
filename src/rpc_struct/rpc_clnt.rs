@@ -166,39 +166,39 @@ impl RpcClient {
         procedure: u32,
         args: impl XdrSerialize,
     ) -> Result<T> {
-        send_rpc_request(self, procedure, args)?;
-        receive_rpc_reply(&mut self.stream)
+        self.send_request(procedure, args)?;
+        self.recv()
     }
-}
 
-fn send_rpc_request(
-    client: &mut RpcClient,
-    procedure: u32,
-    send_data: impl XdrSerialize,
-) -> Result<()> {
-    const REQUEST_HEADER_LEN: usize = 40;
-    let length = REQUEST_HEADER_LEN + send_data.len();
-    let fragment_header = FragmentHeader::new(true, length as u32);
+    fn send_request(&mut self, procedure: u32, args: impl XdrSerialize) -> Result<()> {
+        let request = RpcRequest {
+            header: RpcCall {
+                xid: 123456, // Random but unique number
+                msg_type: 0, // Type: Call
+            },
+            rpc_version: 2,
+            program_num: self.program,
+            version_num: self.version,
+            proc_num: procedure,
+            credentials: 0, // No authentification
+            verifier: 0,
+        };
 
-    // println!("[Rpc-Lib] Request Procedure: {}", procedure);
-    let request = RpcRequest {
-        header: RpcCall {
-            xid: 123456, // Random but unique number
-            msg_type: 0, // Type: Call
-        },
-        rpc_version: 2,
-        program_num: client.program,
-        version_num: client.version,
-        proc_num: procedure,
-        credentials: 0, // No authentification
-        verifier: 0,
-    };
+        let length = request.len() + args.len();
+        let fragment_header = FragmentHeader::new(true, length.try_into().unwrap());
 
-    // Send Request
-    fragment_header.serialize(&mut client.stream)?;
-    request.serialize(&mut client.stream)?;
-    send_data.serialize(&mut client.stream)?;
-    Ok(())
+        fragment_header.serialize(&mut self.stream)?;
+        request.serialize(&mut self.stream)?;
+        args.serialize(&mut self.stream)?;
+
+        Ok(())
+    }
+
+    fn recv<T: XdrDeserialize>(&mut self) -> Result<T> {
+        let mut reader = FragmentReader::new(&mut self.stream);
+        let _rpc_reply = RpcReply::deserialize(&mut reader)?;
+        XdrDeserialize::deserialize(&mut reader)
+    }
 }
 
 struct FragmentReader<R> {
@@ -223,15 +223,4 @@ impl<R: Read> Read for FragmentReader<R> {
         self.nleft -= nread as u32;
         Ok(nread)
     }
-}
-
-fn receive_rpc_reply<T: XdrDeserialize>(reader: impl Read) -> Result<T> {
-    // Packet-length: If the reply is split into multiple fragments,
-    // there will only be the fragment-header
-    //
-    // FRAGMENT-HEADER | REPLY-HEADER | PAYLOAD
-    //        4        |      24      |
-    let mut reader = FragmentReader::new(reader);
-    RpcReply::deserialize(&mut reader)?;
-    XdrDeserialize::deserialize(&mut reader)
 }
