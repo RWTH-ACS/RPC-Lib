@@ -172,7 +172,7 @@ pub fn rpc_call<T: XdrDeserialize>(
     send: impl XdrSerialize,
 ) -> Result<T> {
     send_rpc_request(client, procedure, send)?;
-    receive_rpc_reply(client)
+    receive_rpc_reply(&mut client.stream)
 }
 
 fn send_rpc_request(
@@ -206,51 +206,40 @@ fn send_rpc_request(
     Ok(())
 }
 
-fn receive_rpc_reply<T: XdrDeserialize>(client: &mut RpcClient) -> Result<T> {
+fn receive_rpc_reply<T: XdrDeserialize>(mut reader: impl Read) -> Result<T> {
     // Packet-length: If the reply is split into multiple fragments,
     // there will only be the fragment-header
     //
     // FRAGMENT-HEADER | REPLY-HEADER | PAYLOAD
     //        4        |      24      |
-    const FRAGMENT_HEADER_LEN: usize = 4;
     const REPLY_HEADER_LEN: usize = 24;
-    let mut vec: Vec<u8> = Vec::new();
-    // Receive first fragment
-    let mut last_fragment =
-        receive_reply_packet(client, &mut vec, FRAGMENT_HEADER_LEN + REPLY_HEADER_LEN)?;
-    while !last_fragment {
-        // Receive following fragments
-        last_fragment = receive_reply_packet(client, &mut vec, FRAGMENT_HEADER_LEN)?;
-    }
-    XdrDeserialize::deserialize(&vec[..])
-}
 
-fn receive_reply_packet(
-    client: &mut RpcClient,
-    buffer: &mut Vec<u8>,
-    header_len: usize,
-) -> Result<bool> {
-    // Receive Header
-    let mut header_buf = vec![0; header_len];
-    client.stream.read_exact(&mut header_buf)?;
-    let (payload_length, last_fragment) = if header_len == 28 {
-        let reply_header = RpcReply::deserialize(&header_buf[..])?;
-        (
-            reply_header.header.fragment_header.len() as usize - header_len + 4,
-            reply_header.header.fragment_header.is_last(),
-        )
+    let reply_header = RpcReply::deserialize(&mut reader)?;
+
+    if reply_header.header.fragment_header.is_last() {
+        XdrDeserialize::deserialize(&mut reader)
     } else {
-        let fragment_header = FragmentHeader::deserialize(&header_buf[..])?;
-        (
-            fragment_header.len() as usize - header_len + 4,
-            fragment_header.is_last(),
-        )
-    };
+        let payload_len = reply_header.header.fragment_header.len() as usize - REPLY_HEADER_LEN;
+        let mut vec = Vec::with_capacity(payload_len);
 
-    // Receive Reply-Data
-    let old_len = buffer.len();
-    let new_len = old_len + payload_length;
-    buffer.resize(new_len, 0);
-    client.stream.read_exact(&mut buffer[old_len..new_len])?;
-    Ok(last_fragment)
+        (&mut reader)
+            .take(payload_len as u64)
+            .read_to_end(&mut vec)?;
+
+        loop {
+            // Receive following fragments
+            let fragment_header = FragmentHeader::deserialize(&mut reader)?;
+
+            // Receive Reply-Data
+            (&mut reader)
+                .take(fragment_header.len().into())
+                .read_to_end(&mut vec)?;
+
+            if fragment_header.is_last() {
+                break;
+            }
+        }
+
+        XdrDeserialize::deserialize(&vec[..])
+    }
 }
