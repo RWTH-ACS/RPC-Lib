@@ -6,7 +6,5 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-mod rpc_clnt;
-pub mod xdr;
-
-pub use self::rpc_clnt::{clnt_create, RpcClient};
+pub(crate) mod rpc_clnt;
+pub(crate) mod xdr;

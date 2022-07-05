@@ -39,7 +39,7 @@ impl From<&Structdef> for TokenStream {
         }
         quote! {
             #[derive(Debug)]
-            #[derive(::rpc_lib_derive::XdrDeserialize, ::rpc_lib_derive::XdrSerialize)]
+            #[derive(::rpc_lib::XdrDeserialize, ::rpc_lib::XdrSerialize)]
             struct #name {
                 #struct_code
             }
@@ -225,7 +225,7 @@ mod tests {
         // Code-gen
         let rust_code: TokenStream = quote! {
             #[derive(Debug)]
-            #[derive(::rpc_lib_derive::XdrDeserialize, ::rpc_lib_derive::XdrSerialize)]
+            #[derive(::rpc_lib::XdrDeserialize, ::rpc_lib::XdrSerialize)]
             struct MyStruct_ {
                 x: i32,
                 f: f64,

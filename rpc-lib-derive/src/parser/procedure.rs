@@ -66,7 +66,7 @@ impl From<&Procedure> for TokenStream {
 
             quote! {
                 {
-                    #[derive(::rpc_lib_derive::XdrSerialize)]
+                    #[derive(::rpc_lib::XdrSerialize)]
                     struct Args<'a> {
                         #field_defs
                     }
@@ -146,7 +146,7 @@ mod tests {
         let rust_code: TokenStream = quote! {
             fn PROC_NAME(&mut self, x0: &i32, x1: &f32, ) -> std::io::Result<f32> {
                 self.client.call(1i64 as u32, {
-                    #[derive(::rpc_lib_derive::XdrSerialize)]
+                    #[derive(::rpc_lib::XdrSerialize)]
                     struct Args<'a> {
                         x0: &'a i32,
                         x1: &'a f32,

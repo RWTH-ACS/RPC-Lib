@@ -6,14 +6,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::net::{AddrParseError, IpAddr, TcpStream};
+use std::fmt;
+use std::io::{self, BufReader, BufWriter, ErrorKind, Read, Write};
+use std::net::{AddrParseError, IpAddr, SocketAddr, TcpStream};
 use std::str::FromStr;
-use std::{io::prelude::*, net::SocketAddr};
 
-use rpc_lib_derive::{XdrDeserialize, XdrSerialize};
-
-use super::xdr::*;
-use std::{fmt, io::*};
+use crate::{XdrDeserialize, XdrSerialize};
 
 #[derive(XdrSerialize, XdrDeserialize)]
 struct Rpcb {
@@ -123,7 +121,7 @@ pub struct RpcClient {
 const BUF_SIZE: usize = 256;
 
 // Create Client
-pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> Result<RpcClient> {
+pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> io::Result<RpcClient> {
     let portmap_port = 111;
     let portmap_addr = SocketAddr::new(ip, portmap_port);
     let mut client = RpcClient {
@@ -145,7 +143,7 @@ pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> Result<RpcClient> 
 
     // Convert Universal Address to Standard IP-Format
     if universal_address_s.is_empty() {
-        return Err(Error::new(
+        return Err(io::Error::new(
             ErrorKind::Other,
             "clnt_create: Rpc-Server not available",
         ));
@@ -167,12 +165,12 @@ impl RpcClient {
         &mut self,
         procedure: u32,
         args: impl XdrSerialize,
-    ) -> Result<T> {
+    ) -> io::Result<T> {
         self.send_request(procedure, args)?;
         self.recv()
     }
 
-    fn send_request(&mut self, procedure: u32, args: impl XdrSerialize) -> Result<()> {
+    fn send_request(&mut self, procedure: u32, args: impl XdrSerialize) -> io::Result<()> {
         let request = RpcRequest {
             header: RpcCall {
                 xid: 123456, // Random but unique number
@@ -198,7 +196,7 @@ impl RpcClient {
         Ok(())
     }
 
-    fn recv<T: XdrDeserialize>(&mut self) -> Result<T> {
+    fn recv<T: XdrDeserialize>(&mut self) -> io::Result<T> {
         let mut reader = FragmentReader::new(&mut self.stream);
         let _rpc_reply = RpcReply::deserialize(&mut reader)?;
         XdrDeserialize::deserialize(&mut reader)
@@ -217,7 +215,7 @@ impl<R: Read> FragmentReader<R> {
 }
 
 impl<R: Read> Read for FragmentReader<R> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.nleft == 0 {
             let fragment_header = FragmentHeader::deserialize(&mut self.inner)?;
             self.nleft = fragment_header.len();
