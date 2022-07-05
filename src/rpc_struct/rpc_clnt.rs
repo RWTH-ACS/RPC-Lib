@@ -187,9 +187,11 @@ impl RpcClient {
         let length = request.len() + args.len();
         let fragment_header = FragmentHeader::new(true, length.try_into().unwrap());
 
-        fragment_header.serialize(&mut self.stream)?;
-        request.serialize(&mut self.stream)?;
-        args.serialize(&mut self.stream)?;
+        let mut writer = BufWriter::new(&mut self.stream);
+        fragment_header.serialize(&mut writer)?;
+        request.serialize(&mut writer)?;
+        args.serialize(&mut writer)?;
+        writer.flush()?;
 
         Ok(())
     }
