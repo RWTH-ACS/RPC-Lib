@@ -78,7 +78,7 @@ impl<const LEN: usize> XdrDeserialize for [u8; LEN] {
 }
 
 /// Variable-Length Opaque Data
-impl XdrSerialize for Vec<u8> {
+impl XdrSerialize for [u8] {
     fn len(&self) -> usize {
         (self.len() as u32).len() + self.len() + padding(self.len())
     }
@@ -87,6 +87,16 @@ impl XdrSerialize for Vec<u8> {
         (self.len() as u32).serialize(&mut writer)?;
         writer.write_all(self)?;
         writer.write_all(&[0u8; 3][..padding(self.len())])
+    }
+}
+
+impl XdrSerialize for Vec<u8> {
+    fn len(&self) -> usize {
+        XdrSerialize::len(self.as_slice())
+    }
+
+    fn serialize(&self, writer: impl Write) -> io::Result<()> {
+        self.as_slice().serialize(writer)
     }
 }
 
@@ -124,7 +134,7 @@ impl<T: XdrDeserialize, const LEN: usize> XdrDeserialize for [T; LEN] {
 }
 
 /// Variable-Length Array
-impl<T: XdrSerialize> XdrSerialize for Vec<T> {
+impl<T: XdrSerialize> XdrSerialize for [T] {
     fn len(&self) -> usize {
         (self.len() as u32).len() + self.iter().map(|item| item.len()).sum::<usize>()
     }
@@ -135,6 +145,16 @@ impl<T: XdrSerialize> XdrSerialize for Vec<T> {
             item.serialize(&mut writer)?;
         }
         Ok(())
+    }
+}
+
+impl<T: XdrSerialize> XdrSerialize for Vec<T> {
+    fn len(&self) -> usize {
+        XdrSerialize::len(self.as_slice())
+    }
+
+    fn serialize(&self, writer: impl Write) -> io::Result<()> {
+        self.as_slice().serialize(writer)
     }
 }
 
@@ -149,7 +169,7 @@ impl<T: XdrDeserialize> XdrDeserialize for Vec<T> {
     }
 }
 
-impl XdrSerialize for String {
+impl XdrSerialize for str {
     fn len(&self) -> usize {
         (self.len() as u32).len() + self.len() + padding(self.len())
     }
@@ -159,6 +179,16 @@ impl XdrSerialize for String {
         (self.len() as u32).serialize(&mut writer)?;
         writer.write_all(self.as_bytes())?;
         writer.write_all(&[0u8; 3][..padding(self.len())])
+    }
+}
+
+impl XdrSerialize for String {
+    fn len(&self) -> usize {
+        XdrSerialize::len(self.as_str())
+    }
+
+    fn serialize(&self, writer: impl Write) -> io::Result<()> {
+        self.as_str().serialize(writer)
     }
 }
 
