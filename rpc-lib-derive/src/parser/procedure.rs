@@ -86,11 +86,7 @@ impl From<&Procedure> for TokenStream {
         } else {
             let return_type = TokenStream::from(&proc.return_type);
             quote! { fn #proc_name(&mut self, #arg_defs) -> std::io::Result<#return_type> {
-                // Call
-                let recv = rpc_lib::rpc_call(&mut self.client, #proc_num as u32, #arg)?;
-
-                // Parse ReplyHeader
-                <#return_type>::deserialize(&recv[..])
+                rpc_lib::rpc_call(&mut self.client, #proc_num as u32, #arg)
             }}
         }
     }
@@ -149,7 +145,7 @@ mod tests {
         // Code-gen
         let rust_code: TokenStream = quote! {
             fn PROC_NAME(&mut self, x0: &i32, x1: &f32, ) -> std::io::Result<f32> {
-                let recv = rpc_lib::rpc_call(&mut self.client, 1i64 as u32, {
+                rpc_lib::rpc_call(&mut self.client, 1i64 as u32, {
                     #[derive(::rpc_lib_derive::XdrSerialize)]
                     struct Args<'a> {
                         x0: &'a i32,
@@ -160,8 +156,7 @@ mod tests {
                         x0,
                         x1,
                     }
-                })?;
-                <f32>::deserialize(&recv[..])
+                })
             }
         };
         let generated_code: TokenStream = (&proc_generated).into();

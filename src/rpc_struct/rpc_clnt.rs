@@ -143,10 +143,9 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     };
 
     // Proc 3: GETADDR
-    let vec = rpc_call(&mut client, 3, &rpcb)?;
+    let universal_address_s: String = rpc_call(&mut client, 3, &rpcb)?;
 
-    // Parse Universal Address & Convert to Standard IP-Format
-    let universal_address_s = String::deserialize(&vec[..])?;
+    // Convert Universal Address to Standard IP-Format
     if universal_address_s.is_empty() {
         return Err(Error::new(
             ErrorKind::Other,
@@ -165,11 +164,11 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
     })
 }
 
-pub fn rpc_call(
+pub fn rpc_call<T: XdrDeserialize>(
     client: &mut RpcClient,
     procedure: u32,
     send: impl XdrSerialize,
-) -> Result<Vec<u8>> {
+) -> Result<T> {
     send_rpc_request(client, procedure, send)?;
     receive_rpc_reply(client)
 }
@@ -205,7 +204,7 @@ fn send_rpc_request(
     Ok(())
 }
 
-fn receive_rpc_reply(client: &mut RpcClient) -> Result<Vec<u8>> {
+fn receive_rpc_reply<T: XdrDeserialize>(client: &mut RpcClient) -> Result<T> {
     // Packet-length: If the reply is split into multiple fragments,
     // there will only be the fragment-header
     //
@@ -221,7 +220,7 @@ fn receive_rpc_reply(client: &mut RpcClient) -> Result<Vec<u8>> {
         // Receive following fragments
         last_fragment = receive_reply_packet(client, &mut vec, FRAGMENT_HEADER_LEN)?;
     }
-    Ok(vec)
+    XdrDeserialize::deserialize(&vec[..])
 }
 
 fn receive_reply_packet(
