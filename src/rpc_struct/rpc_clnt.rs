@@ -115,7 +115,8 @@ impl FromStr for UniversalAddr {
 pub struct RpcClient {
     program: u32,
     version: u32,
-    stream: BufReader<TcpStream>,
+    reader: BufReader<TcpStream>,
+    writer: BufWriter<TcpStream>,
 }
 
 const BUF_SIZE: usize = 256;
@@ -124,10 +125,12 @@ const BUF_SIZE: usize = 256;
 pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> io::Result<RpcClient> {
     let portmap_port = 111;
     let portmap_addr = SocketAddr::new(ip, portmap_port);
+    let tcp_stream = TcpStream::connect(portmap_addr)?;
     let mut client = RpcClient {
         program: 100000,
         version: 4,
-        stream: BufReader::with_capacity(BUF_SIZE, TcpStream::connect(portmap_addr)?),
+        reader: BufReader::with_capacity(BUF_SIZE, tcp_stream.try_clone()?),
+        writer: BufWriter::with_capacity(BUF_SIZE, tcp_stream),
     };
 
     let rpcb = Rpcb {
@@ -151,12 +154,13 @@ pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> io::Result<RpcClie
     let addr = UniversalAddr::from_str(&universal_address_s).unwrap();
 
     // Create TcpStream
-    let stream = BufReader::with_capacity(BUF_SIZE, TcpStream::connect(addr.0)?);
+    let tcp_stream = TcpStream::connect(addr.0)?;
 
     Ok(RpcClient {
         program,
         version,
-        stream,
+        reader: BufReader::with_capacity(BUF_SIZE, tcp_stream.try_clone()?),
+        writer: BufWriter::with_capacity(BUF_SIZE, tcp_stream),
     })
 }
 
@@ -187,17 +191,16 @@ impl RpcClient {
         let length = request.len() + args.len();
         let fragment_header = FragmentHeader::new(true, length.try_into().unwrap());
 
-        let mut writer = BufWriter::with_capacity(BUF_SIZE, self.stream.get_mut());
-        fragment_header.serialize(&mut writer)?;
-        request.serialize(&mut writer)?;
-        args.serialize(&mut writer)?;
-        writer.flush()?;
+        fragment_header.serialize(&mut self.writer)?;
+        request.serialize(&mut self.writer)?;
+        args.serialize(&mut self.writer)?;
+        self.writer.flush()?;
 
         Ok(())
     }
 
     fn recv<T: XdrDeserialize>(&mut self) -> io::Result<T> {
-        let mut reader = FragmentReader::new(&mut self.stream);
+        let mut reader = FragmentReader::new(&mut self.reader);
         let _rpc_reply = RpcReply::deserialize(&mut reader)?;
         XdrDeserialize::deserialize(&mut reader)
     }
