@@ -83,7 +83,7 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
             /// connects to it.
             fn new(address: &str) -> std::io::Result<#name> {
                 Ok(#name {
-                    client: rpc_lib::clnt_create(address, #prog_num, #ver_num)?
+                    client: rpc_lib::clnt_create(address.parse().unwrap(), #prog_num, #ver_num)?
                 })
             }
         }

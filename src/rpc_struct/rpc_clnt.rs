@@ -6,9 +6,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::io::prelude::*;
-use std::net::TcpStream;
+use std::net::{AddrParseError, IpAddr, TcpStream};
+use std::str::FromStr;
 use std::vec::Vec;
+use std::{io::prelude::*, net::SocketAddr};
 
 use rpc_lib_derive::{XdrDeserialize, XdrSerialize};
 
@@ -79,10 +80,37 @@ struct RpcReply {
     // Serialized Data (Return Value of RPC-Procedure)
 }
 
+/// Universal Address
+///
+/// Defined in [RFC 3530](https://www.rfc-editor.org/rfc/rfc3530)
 #[derive(Debug)]
-struct UniversalAddress {
-    ip: [u8; 4],
-    port: u16,
+struct UniversalAddr(SocketAddr);
+
+impl From<SocketAddr> for UniversalAddr {
+    fn from(socket_addr: SocketAddr) -> Self {
+        Self(socket_addr)
+    }
+}
+
+impl fmt::Display for UniversalAddr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ip = self.0.ip();
+        let [o1, o2] = self.0.port().to_be_bytes();
+        write!(f, "{ip}.{o1}.{o2}")
+    }
+}
+
+impl FromStr for UniversalAddr {
+    type Err = AddrParseError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let mut split = s.rsplitn(3, '.');
+        let o2 = split.next().unwrap().parse().unwrap();
+        let o1 = split.next().unwrap().parse().unwrap();
+        let port = u16::from_be_bytes([o1, o2]);
+        let ip = split.next().unwrap();
+        Ok(Self(SocketAddr::new(ip.parse()?, port)))
+    }
 }
 
 /// Contains required fields to make RPC-Calls.
@@ -98,47 +126,21 @@ pub struct RpcClient {
     stream: TcpStream,
 }
 
-impl UniversalAddress {
-    // Format: xxx.xxx.xxx.xxx.xxx.xxx
-    fn from_string(s: &str) -> UniversalAddress {
-        let splitted = s.split('.').collect::<Vec<&str>>();
-        let mut ret = UniversalAddress {
-            ip: [0, 0, 0, 0],
-            port: 0,
-        };
-        for (i, splitted) in splitted.iter().enumerate().take(4) {
-            ret.ip[i] = splitted.parse::<u8>().unwrap();
-        }
-        ret.port = splitted[4].parse::<u16>().unwrap() * 256;
-        ret.port += splitted[5].parse::<u16>().unwrap();
-        ret
-    }
-}
-
-impl fmt::Display for UniversalAddress {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}.{}.{}.{}:{}",
-            self.ip[0], self.ip[1], self.ip[2], self.ip[3], self.port,
-        )
-    }
-}
-
 // Create Client
-pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClient> {
-    let univ_addr_portmap = UniversalAddress::from_string(&(String::from(address) + ".0.111")); // Port of Portmap Service in universal address format
+pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> Result<RpcClient> {
+    let portmap_port = 111;
+    let portmap_addr = SocketAddr::new(ip, portmap_port);
     let mut client = RpcClient {
         program: 100000,
         version: 4,
-        stream: TcpStream::connect(univ_addr_portmap.to_string())?,
+        stream: TcpStream::connect(portmap_addr)?,
     };
 
     let rpcb = Rpcb {
         program,
         version,
         netid: String::from("tcp"),
-        address: String::from(address) + ".0.111", // Port of Portmap Service in universal address format
+        address: UniversalAddr::from(portmap_addr).to_string(),
         owner: String::from("rpclib"),
     };
 
@@ -152,10 +154,10 @@ pub fn clnt_create(address: &str, program: u32, version: u32) -> Result<RpcClien
             "clnt_create: Rpc-Server not available",
         ));
     }
-    let ip = UniversalAddress::from_string(&universal_address_s);
+    let addr = UniversalAddr::from_str(&universal_address_s).unwrap();
 
     // Create TcpStream
-    let stream = TcpStream::connect(ip.to_string())?;
+    let stream = TcpStream::connect(addr.0)?;
 
     Ok(RpcClient {
         program,
