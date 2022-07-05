@@ -139,7 +139,6 @@ impl From<&Uniondef> for TokenStream {
             }
         }
 
-        // Functions for Trait Xdr:
         let deserialization_func = make_deserialize_function_code(&union_def.union_body);
         let serialization_func = make_serialization_function_code(&union_def.union_body);
 
@@ -150,10 +149,11 @@ impl From<&Uniondef> for TokenStream {
                 CaseDefault,
             }
 
-            impl Xdr for #name {
-
+            impl XdrDeserialize for #name {
                 #deserialization_func
+            }
 
+            impl XdrSerialize for #name {
                 #serialization_func
             }
         }
@@ -387,7 +387,7 @@ mod tests {
         // Code-gen
         let rust_code: TokenStream = quote! {
             enum MyUnion2 { Case0 { result: i32 }, Case2 { result: f32 }, CaseDefault, }
-            impl Xdr for MyUnion2 {
+            impl XdrDeserialize for MyUnion2 {
                 fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
                     let err_code = i32::deserialize(&mut reader)?;
                     Ok(match err_code {
@@ -397,6 +397,8 @@ mod tests {
                         _ => panic!("Unknown field of discriminated union with Field-Value {}", err_code),
                     })
                 }
+            }
+            impl XdrSerialize for MyUnion2 {
                 fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
                     match self {
                         Self::Case0 { result } => {

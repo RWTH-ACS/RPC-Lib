@@ -10,12 +10,12 @@ use std::io::prelude::*;
 use std::net::TcpStream;
 use std::vec::Vec;
 
-use rpc_lib_derive::Xdr;
+use rpc_lib_derive::{XdrDeserialize, XdrSerialize};
 
 use super::xdr::*;
 use std::{fmt, io::*};
 
-#[derive(Xdr)]
+#[derive(XdrSerialize, XdrDeserialize)]
 struct Rpcb {
     program: u32,
     version: u32,
@@ -24,7 +24,7 @@ struct Rpcb {
     owner: String,
 }
 
-#[derive(Xdr, Debug)]
+#[derive(XdrSerialize, XdrDeserialize, Debug)]
 struct FragmentHeader {
     number: u32,
 }
@@ -52,14 +52,14 @@ impl FragmentHeader {
     }
 }
 
-#[derive(Xdr, Debug)]
+#[derive(XdrSerialize, XdrDeserialize, Debug)]
 struct RpcCall {
     fragment_header: FragmentHeader,
     xid: u32,
     msg_type: u32, // (Call: 0, Reply: 1)
 }
 
-#[derive(Xdr)]
+#[derive(XdrSerialize, XdrDeserialize)]
 struct RpcRequest {
     header: RpcCall,
     rpc_version: u32,
@@ -70,7 +70,7 @@ struct RpcRequest {
     verifier: u64,
 }
 
-#[derive(Xdr, Debug)]
+#[derive(XdrSerialize, XdrDeserialize, Debug)]
 struct RpcReply {
     header: RpcCall,
     reply_state: u32,

@@ -50,7 +50,7 @@ pub fn parse(x_file: &str, struct_name: &str) -> (TokenStream, u32, u32) {
                 let proc_code = TokenStream::from(&program);
                 code = quote! {
                     #code
-                    use rpc_lib::Xdr;
+                    use rpc_lib::{XdrDeserialize, XdrSerialize};
                     impl #s_name {
                         #proc_code
                     }

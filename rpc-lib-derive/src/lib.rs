@@ -17,8 +17,9 @@ use std::path::Path;
 
 use quote::{format_ident, quote};
 
+mod de;
 mod parser;
-mod xdr;
+mod ser;
 
 #[proc_macro_attribute]
 pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
@@ -96,8 +97,14 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
     code.into()
 }
 
-#[proc_macro_derive(Xdr)]
-pub fn xdr(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(XdrSerialize)]
+pub fn xdr_ser(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    xdr::expand_derive_xdr(input).into()
+    ser::expand_derive_ser(input).into()
+}
+
+#[proc_macro_derive(XdrDeserialize)]
+pub fn xdr_de(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    de::expand_derive_de(input).into()
 }

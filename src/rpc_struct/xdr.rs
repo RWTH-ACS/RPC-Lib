@@ -11,13 +11,19 @@ use std::io::{self, Read, Write};
 use std::mem;
 use std::vec::Vec;
 
-/// Types with the `Xdr`-Trait can be serialised and deserialised as described in [`RFC 4506`]
+/// A data structure that can be serialized into the XDR format as described in [`RFC 4506`].
 ///
 /// [`RFC 4506`]: <https://datatracker.ietf.org/doc/html/rfc4506>
-pub trait Xdr: Sized {
-    // Serializes data and converts to network byte order
+pub trait XdrSerialize {
+    /// Serialize this value into the given writer.
     fn serialize(&self, writer: impl Write) -> io::Result<()>;
-    // Reverse Operation
+}
+
+/// A data structure that can be deserialized from the XDR format as described in [`RFC 4506`].
+///
+/// [`RFC 4506`]: <https://datatracker.ietf.org/doc/html/rfc4506>
+pub trait XdrDeserialize: Sized {
+    /// Deserialize this value from the given reader.
     fn deserialize(reader: impl Read) -> io::Result<Self>;
 }
 
@@ -26,12 +32,14 @@ fn padding(len: usize) -> usize {
 }
 
 /// Fixed-Length Opaque Data
-impl<const LEN: usize> Xdr for [u8; LEN] {
+impl<const LEN: usize> XdrSerialize for [u8; LEN] {
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         writer.write_all(self)?;
         writer.write_all(&[0u8; 3][..padding(LEN)])
     }
+}
 
+impl<const LEN: usize> XdrDeserialize for [u8; LEN] {
     fn deserialize(mut reader: impl Read) -> io::Result<Self> {
         let mut this = [0; LEN];
         reader.read_exact(&mut this)?;
@@ -40,13 +48,15 @@ impl<const LEN: usize> Xdr for [u8; LEN] {
 }
 
 /// Variable-Length Opaque Data
-impl Xdr for Vec<u8> {
+impl XdrSerialize for Vec<u8> {
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         (self.len() as u32).serialize(&mut writer)?;
         writer.write_all(self)?;
         writer.write_all(&[0u8; 3][..padding(self.len())])
     }
+}
 
+impl XdrDeserialize for Vec<u8> {
     fn deserialize(mut reader: impl Read) -> io::Result<Self> {
         let len = u32::deserialize(&mut reader)? as usize;
         let mut this = vec![0; len];
@@ -56,14 +66,16 @@ impl Xdr for Vec<u8> {
 }
 
 /// Fixed-Length Array
-impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
+impl<T: XdrSerialize, const LEN: usize> XdrSerialize for [T; LEN] {
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         for item in self {
             item.serialize(&mut writer)?;
         }
         Ok(())
     }
+}
 
+impl<T: XdrDeserialize, const LEN: usize> XdrDeserialize for [T; LEN] {
     fn deserialize(mut reader: impl Read) -> io::Result<Self> {
         let mut vec = Vec::with_capacity(LEN);
         for _ in 0..LEN {
@@ -74,7 +86,7 @@ impl<T: Xdr, const LEN: usize> Xdr for [T; LEN] {
 }
 
 /// Variable-Length Array
-impl<T: Xdr> Xdr for Vec<T> {
+impl<T: XdrSerialize> XdrSerialize for Vec<T> {
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         (self.len() as u32).serialize(&mut writer)?;
         for item in self {
@@ -82,7 +94,9 @@ impl<T: Xdr> Xdr for Vec<T> {
         }
         Ok(())
     }
+}
 
+impl<T: XdrDeserialize> XdrDeserialize for Vec<T> {
     fn deserialize(mut reader: impl Read) -> io::Result<Self> {
         let len = u32::deserialize(&mut reader)? as usize;
         let mut this = Vec::with_capacity(len);
@@ -93,14 +107,16 @@ impl<T: Xdr> Xdr for Vec<T> {
     }
 }
 
-impl Xdr for String {
+impl XdrSerialize for String {
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         assert!(self.is_ascii());
         (self.len() as u32).serialize(&mut writer)?;
         writer.write_all(self.as_bytes())?;
         writer.write_all(&[0u8; 3][..padding(self.len())])
     }
+}
 
+impl XdrDeserialize for String {
     fn deserialize(reader: impl Read) -> io::Result<Self> {
         let vec = Vec::<u8>::deserialize(reader)?;
         Ok(Self::from_utf8(vec).unwrap())
@@ -109,11 +125,13 @@ impl Xdr for String {
 
 macro_rules! impl_xdr_be_bytes {
     ($Ty:ty) => {
-        impl Xdr for $Ty {
+        impl XdrSerialize for $Ty {
             fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
                 writer.write_all(&self.to_be_bytes())
             }
+        }
 
+        impl XdrDeserialize for $Ty {
             fn deserialize(mut reader: impl Read) -> io::Result<Self> {
                 let mut buf = [0; mem::size_of::<Self>()];
                 reader.read_exact(&mut buf)?;

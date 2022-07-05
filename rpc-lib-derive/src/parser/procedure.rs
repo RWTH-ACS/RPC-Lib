@@ -24,6 +24,7 @@ pub struct Procedure {
 impl From<&Procedure> for TokenStream {
     fn from(proc: &Procedure) -> TokenStream {
         let proc_name = format_ident!("{}", proc.name);
+
         let mut args = quote!();
         let mut serialization_code = quote!( let mut send_data = std::vec::Vec::new(); );
         for (i, arg) in proc.args.iter().enumerate() {

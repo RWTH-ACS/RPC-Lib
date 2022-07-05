@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DataStruct, DeriveInput, Fields, Ident};
 
-pub fn expand_derive_xdr(input: DeriveInput) -> TokenStream {
+pub fn expand_derive_ser(input: DeriveInput) -> TokenStream {
     let struct_ident = input.ident;
     match input.data {
         Data::Struct(data_struct) => expand_struct(struct_ident, data_struct),
@@ -28,28 +28,11 @@ pub fn expand_struct(struct_ident: Ident, data_struct: DataStruct) -> TokenStrea
         })
         .collect::<TokenStream>();
 
-    let deserializations = fields_named
-        .named
-        .iter()
-        .map(|field| {
-            let ident = &field.ident;
-            quote! {
-                #ident: Xdr::deserialize(&mut reader)?,
-            }
-        })
-        .collect::<TokenStream>();
-
     quote! {
-        impl Xdr for #struct_ident {
+        impl XdrSerialize for #struct_ident {
             fn serialize(&self, mut writer: impl ::std::io::Write) -> ::std::io::Result<()> {
                 #serializations
                 Ok(())
-            }
-
-            fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
-                Ok(Self {
-                    #deserializations
-                })
             }
         }
     }
@@ -72,22 +55,15 @@ mod tests {
         };
 
         let output = quote! {
-            impl Xdr for Foo {
+            impl XdrSerialize for Foo {
                 fn serialize(&self, mut writer: impl ::std::io::Write) -> ::std::io::Result<()> {
                     self.bar.serialize(&mut writer)?;
                     self.baz.serialize(&mut writer)?;
                     Ok(())
                 }
-
-                fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
-                    Ok(Self {
-                        bar: Xdr::deserialize(&mut reader)?,
-                        baz: Xdr::deserialize(&mut reader)?,
-                    })
-                }
             }
         };
 
-        assert_eq!(output.to_string(), expand_derive_xdr(input).to_string());
+        assert_eq!(output.to_string(), expand_derive_ser(input).to_string());
     }
 }
