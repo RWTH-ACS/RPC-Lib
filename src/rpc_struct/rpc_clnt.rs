@@ -120,6 +120,8 @@ pub struct RpcClient {
     stream: BufReader<TcpStream>,
 }
 
+const BUF_SIZE: usize = 256;
+
 // Create Client
 pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> Result<RpcClient> {
     let portmap_port = 111;
@@ -127,7 +129,7 @@ pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> Result<RpcClient> 
     let mut client = RpcClient {
         program: 100000,
         version: 4,
-        stream: BufReader::new(TcpStream::connect(portmap_addr)?),
+        stream: BufReader::with_capacity(BUF_SIZE, TcpStream::connect(portmap_addr)?),
     };
 
     let rpcb = Rpcb {
@@ -151,7 +153,7 @@ pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> Result<RpcClient> 
     let addr = UniversalAddr::from_str(&universal_address_s).unwrap();
 
     // Create TcpStream
-    let stream = BufReader::new(TcpStream::connect(addr.0)?);
+    let stream = BufReader::with_capacity(BUF_SIZE, TcpStream::connect(addr.0)?);
 
     Ok(RpcClient {
         program,
@@ -187,7 +189,7 @@ impl RpcClient {
         let length = request.len() + args.len();
         let fragment_header = FragmentHeader::new(true, length.try_into().unwrap());
 
-        let mut writer = BufWriter::new(self.stream.get_mut());
+        let mut writer = BufWriter::with_capacity(BUF_SIZE, self.stream.get_mut());
         fragment_header.serialize(&mut writer)?;
         request.serialize(&mut writer)?;
         args.serialize(&mut writer)?;
