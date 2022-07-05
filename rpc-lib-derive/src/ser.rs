@@ -21,6 +21,17 @@ pub fn expand_struct(
         Fields::Unnamed(_) | Fields::Unit => unreachable!(),
     };
 
+    let lengths = fields_named
+        .named
+        .iter()
+        .map(|field| {
+            let field_ident = &field.ident;
+            quote! {
+                XdrSerialize::len(&self.#field_ident) +
+            }
+        })
+        .collect::<TokenStream>();
+
     let serializations = fields_named
         .named
         .iter()
@@ -34,6 +45,10 @@ pub fn expand_struct(
 
     quote! {
         impl #generics XdrSerialize for #struct_ident #generics {
+            fn len(&self) -> usize {
+                #lengths 0
+            }
+
             fn serialize(&self, mut writer: impl ::std::io::Write) -> ::std::io::Result<()> {
                 #serializations
                 Ok(())
@@ -60,6 +75,10 @@ mod tests {
 
         let output = quote! {
             impl XdrSerialize for Foo {
+                fn len(&self) -> usize {
+                    XdrSerialize::len(&self.bar) + XdrSerialize::len(&self.baz) + 0
+                }
+
                 fn serialize(&self, mut writer: impl ::std::io::Write) -> ::std::io::Result<()> {
                     self.bar.serialize(&mut writer)?;
                     self.baz.serialize(&mut writer)?;
@@ -82,6 +101,10 @@ mod tests {
 
         let output = quote! {
             impl<'a> XdrSerialize for Foo<'a> {
+                fn len(&self) -> usize {
+                    XdrSerialize::len(&self.bar) + XdrSerialize::len(&self.baz) + 0
+                }
+
                 fn serialize(&self, mut writer: impl ::std::io::Write) -> ::std::io::Result<()> {
                     self.bar.serialize(&mut writer)?;
                     self.baz.serialize(&mut writer)?;

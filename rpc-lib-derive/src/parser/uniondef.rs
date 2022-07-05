@@ -75,6 +75,42 @@ fn make_deserialize_function_code(union: &Union) -> TokenStream {
     }
 }
 
+fn make_len_function_code(union: &Union) -> TokenStream {
+    let mut match_arms = quote!();
+    match &union.discriminant {
+        DiscriminantType::Int => {
+            // Cases:
+            for (case_val, data_decl) in &union.cases {
+                let number = *match case_val {
+                    Value::Numeric { val } => val,
+                    _ => panic!("Union: Case has to be integer when discriminanttype is int!"),
+                } as i32;
+                let case_ident = format_ident!("Case{}", number as u32);
+                let decl_name = format_ident!("{}", data_decl.name);
+                match_arms = quote! { #match_arms
+                    Self :: #case_ident { #decl_name } => {
+                        XdrSerialize::len(&#number) + XdrSerialize::len(&#decl_name)
+                    }
+                };
+            }
+            // Default-Case:
+            match_arms = quote! { #match_arms
+                Self::CaseDefault => { 0 }
+            };
+        }
+        DiscriminantType::UnsignedInt => panic!("Unsigned int as discriminant not implemented yet"),
+        DiscriminantType::Boolean => panic!("Boolean as discriminant not implemented yet"),
+        DiscriminantType::Enum { name: _ } => panic!("Enum as discriminant not implemented yet"),
+    }
+    quote! {
+        fn len(&self) -> usize {
+            match self {
+                #match_arms
+            }
+        }
+    }
+}
+
 fn make_serialization_function_code(union: &Union) -> TokenStream {
     let mut match_arms = quote!();
     match &union.discriminant {
@@ -141,6 +177,7 @@ impl From<&Uniondef> for TokenStream {
 
         let deserialization_func = make_deserialize_function_code(&union_def.union_body);
         let serialization_func = make_serialization_function_code(&union_def.union_body);
+        let len_func = make_len_function_code(&union_def.union_body);
 
         // Paste together
         quote! {
@@ -154,6 +191,8 @@ impl From<&Uniondef> for TokenStream {
             }
 
             impl XdrSerialize for #name {
+                #len_func
+
                 #serialization_func
             }
         }
@@ -399,6 +438,18 @@ mod tests {
                 }
             }
             impl XdrSerialize for MyUnion2 {
+                fn len(&self) -> usize {
+                    match self {
+                        Self::Case0 { result } => {
+                            XdrSerialize::len(&0i32) + XdrSerialize::len(&result)
+                        }
+                        Self::Case2 { result } => {
+                            XdrSerialize::len(&2i32) + XdrSerialize::len(&result)
+                        }
+                        Self::CaseDefault => { 0 }
+                    }
+                }
+
                 fn serialize(&self, mut writer: impl std::io::Write) -> std::io::Result<()> {
                     match self {
                         Self::Case0 { result } => {

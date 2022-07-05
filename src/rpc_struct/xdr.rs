@@ -14,7 +14,11 @@ use std::vec::Vec;
 /// A data structure that can be serialized into the XDR format as described in [`RFC 4506`].
 ///
 /// [`RFC 4506`]: <https://datatracker.ietf.org/doc/html/rfc4506>
+#[allow(clippy::len_without_is_empty)]
 pub trait XdrSerialize {
+    /// Returns the exact length of this type once serialized in bytes.
+    fn len(&self) -> usize;
+
     /// Serialize this value into the given writer.
     fn serialize(&self, writer: impl Write) -> io::Result<()>;
 }
@@ -32,12 +36,21 @@ fn padding(len: usize) -> usize {
 }
 
 impl XdrSerialize for () {
+    fn len(&self) -> usize {
+        0
+    }
+
     fn serialize(&self, _writer: impl Write) -> io::Result<()> {
         Ok(())
     }
 }
 
 impl<T: XdrSerialize + ?Sized> XdrSerialize for &T {
+    #[inline]
+    fn len(&self) -> usize {
+        (**self).len()
+    }
+
     #[inline]
     fn serialize(&self, writer: impl Write) -> io::Result<()> {
         (**self).serialize(writer)
@@ -46,6 +59,10 @@ impl<T: XdrSerialize + ?Sized> XdrSerialize for &T {
 
 /// Fixed-Length Opaque Data
 impl<const LEN: usize> XdrSerialize for [u8; LEN] {
+    fn len(&self) -> usize {
+        LEN + padding(LEN)
+    }
+
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         writer.write_all(self)?;
         writer.write_all(&[0u8; 3][..padding(LEN)])
@@ -62,6 +79,10 @@ impl<const LEN: usize> XdrDeserialize for [u8; LEN] {
 
 /// Variable-Length Opaque Data
 impl XdrSerialize for Vec<u8> {
+    fn len(&self) -> usize {
+        (self.len() as u32).len() + self.len() + padding(self.len())
+    }
+
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         (self.len() as u32).serialize(&mut writer)?;
         writer.write_all(self)?;
@@ -80,6 +101,10 @@ impl XdrDeserialize for Vec<u8> {
 
 /// Fixed-Length Array
 impl<T: XdrSerialize, const LEN: usize> XdrSerialize for [T; LEN] {
+    fn len(&self) -> usize {
+        self.iter().map(|item| item.len()).sum()
+    }
+
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         for item in self {
             item.serialize(&mut writer)?;
@@ -100,6 +125,10 @@ impl<T: XdrDeserialize, const LEN: usize> XdrDeserialize for [T; LEN] {
 
 /// Variable-Length Array
 impl<T: XdrSerialize> XdrSerialize for Vec<T> {
+    fn len(&self) -> usize {
+        (self.len() as u32).len() + self.iter().map(|item| item.len()).sum::<usize>()
+    }
+
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         (self.len() as u32).serialize(&mut writer)?;
         for item in self {
@@ -121,6 +150,10 @@ impl<T: XdrDeserialize> XdrDeserialize for Vec<T> {
 }
 
 impl XdrSerialize for String {
+    fn len(&self) -> usize {
+        (self.len() as u32).len() + self.len() + padding(self.len())
+    }
+
     fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
         assert!(self.is_ascii());
         (self.len() as u32).serialize(&mut writer)?;
@@ -139,6 +172,10 @@ impl XdrDeserialize for String {
 macro_rules! impl_xdr_be_bytes {
     ($Ty:ty) => {
         impl XdrSerialize for $Ty {
+            fn len(&self) -> usize {
+                mem::size_of::<Self>()
+            }
+
             fn serialize(&self, mut writer: impl Write) -> io::Result<()> {
                 writer.write_all(&self.to_be_bytes())
             }
