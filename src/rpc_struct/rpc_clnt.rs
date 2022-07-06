@@ -228,4 +228,16 @@ impl<R: Read> Read for FragmentReader<R> {
         self.nleft -= nread as u32;
         Ok(nread)
     }
+
+    fn read_exact(&mut self, mut buf: &mut [u8]) -> io::Result<()> {
+        while buf.len() > self.nleft as usize {
+            self.inner.read_exact(&mut buf[..self.nleft as usize])?;
+            buf = &mut buf[self.nleft as usize..];
+            let fragment_header = FragmentHeader::deserialize(&mut self.inner)?;
+            self.nleft = fragment_header.len();
+        }
+
+        self.nleft -= buf.len() as u32;
+        self.inner.read_exact(buf)
+    }
 }
