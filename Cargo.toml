@@ -1,8 +1,8 @@
 [package]
 name = "rpc-lib"
-version = "1.0.0"
+version = "0.1.0"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-rpc-lib-impl = { version = "1.0.0", path = "rpc-lib-impl" }
+rpc-lib-impl = { version = "0.1.0", path = "rpc-lib-impl" }
 quote = "1.0"
