@@ -165,6 +165,10 @@ pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> io::Result<RpcClie
 }
 
 impl RpcClient {
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.reader.get_ref().peer_addr()
+    }
+
     pub fn call<T: XdrDeserialize>(
         &mut self,
         procedure: u32,
