@@ -8,7 +8,7 @@
 
 use crate::parser::Rule;
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 
 use super::constant::Value;
 use super::datatype::DataType;
@@ -39,7 +39,10 @@ pub fn decl_type_to_rust(decl_type: &DeclarationType, data_type: &DataType) -> T
             quote!(std::vec::Vec<#data_type>)
         }
         DeclarationType::FixedlenArray { length } => {
-            let len: TokenStream = length.into();
+            let len = match length {
+                Value::Numeric { val } => usize::try_from(*val).unwrap().to_token_stream(),
+                Value::Named { name } => name.to_token_stream(),
+            };
             quote!([#data_type; #len])
         }
         DeclarationType::TypeNameDecl => {
