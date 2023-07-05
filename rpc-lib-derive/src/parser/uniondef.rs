@@ -7,6 +7,7 @@
 // except according to those terms.
 
 use crate::parser::Rule;
+use crate::parser::declaration::decl_type_to_rust;
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -48,8 +49,9 @@ fn make_deserialize_function_code(union: &Union) -> TokenStream {
                 } as i32;
                 let case_ident = format_ident!("Case{}", number as u32);
                 if data_decl.decl_type != DeclarationType::VoidDecl {
-                    let decl: TokenStream = data_decl.into();
-                    match_code = quote!( #match_code #number => Self :: #case_ident { #decl :: deserialize(&mut reader)? }, );
+                    let name = quote::format_ident!("{}", data_decl.name);
+                    let decl_type = decl_type_to_rust(&data_decl.decl_type, &data_decl.data_type);
+                    match_code = quote!( #match_code #number => Self :: #case_ident { #name: <#decl_type>::deserialize(&mut reader)? }, );
                 } else {
                     match_code = quote!( #match_code #number => Self :: #case_ident, );
                 }
@@ -123,7 +125,7 @@ fn make_serialization_function_code(union: &Union) -> TokenStream {
                 } as i32;
                 let case_ident = format_ident!("Case{}", number as u32);
                 let decl_name = format_ident!("{}", data_decl.name);
-                let decl_type = TokenStream::from(&data_decl.data_type);
+                let decl_type = decl_type_to_rust(&data_decl.decl_type, &data_decl.data_type);
                 match_arms = quote! { #match_arms
                     Self :: #case_ident { #decl_name } => {
                         i32::serialize(&#number, &mut writer)?;
@@ -167,10 +169,8 @@ impl From<&Uniondef> for TokenStream {
                     union_body = quote!( #union_body #case_name,);
                 }
                 _ => {
-                    let data_type_code = TokenStream::from(&decl.data_type);
-                    let decl_name_code = quote::format_ident!("{}", decl.name);
-                    union_body =
-                        quote!( #union_body #case_name { #decl_name_code: #data_type_code},);
+                    let decl_code = TokenStream::from(decl);
+                    union_body = quote!( #union_body #case_name { #decl_code},);
                 }
             }
         }
