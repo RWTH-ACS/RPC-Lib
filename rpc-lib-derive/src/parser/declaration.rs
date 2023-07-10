@@ -262,7 +262,7 @@ mod tests {
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote! { arr: [i32; 35i64] };
+        let rust_code: TokenStream = quote! { arr: [i32; 35usize] };
         let generated_code: TokenStream = (&decl_generated).into();
         assert!(
             generated_code.to_string() == rust_code.to_string(),
@@ -289,7 +289,7 @@ mod tests {
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
         // Code-gen
-        let rust_code: TokenStream = quote! { _XR234z: [CustomType; 25i64] };
+        let rust_code: TokenStream = quote! { _XR234z: [CustomType; 25usize] };
         let generated_code: TokenStream = (&decl_generated).into();
         assert!(
             generated_code.to_string() == rust_code.to_string(),
