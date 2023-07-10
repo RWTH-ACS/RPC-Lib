@@ -432,8 +432,8 @@ mod tests {
                 fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
                     let err_code = i32::deserialize(&mut reader)?;
                     Ok(match err_code {
-                        0i32 => Self::Case0 { result: i32::deserialize(&mut reader)? },
-                        2i32 => Self::Case2 { result: f32::deserialize(&mut reader)? },
+                        0i32 => Self::Case0 { result: <i32>::deserialize(&mut reader)? },
+                        2i32 => Self::Case2 { result: <f32>::deserialize(&mut reader)? },
                         _ => Self::CaseDefault,
                         _ => panic!("Unknown field of discriminated union with Field-Value {}", err_code),
                     })
