@@ -45,7 +45,7 @@ fn union_return() {
             ResultUnion::Case20 { float_res } => {
                 float_res
             }
-            ResultUnion::CaseDefault => panic!("Wrong Type"),
+            ResultUnion::CaseDefault(_i) => panic!("Wrong Type"),
         } == 1.0f32,
         "Union Test failed"
     );
@@ -57,7 +57,7 @@ fn union_return() {
                 int_res
             }
             ResultUnion::Case20 { float_res: _ } => panic!("Wrong Type"),
-            ResultUnion::CaseDefault => panic!("Wrong Type"),
+            ResultUnion::CaseDefault(_i) => panic!("Wrong Type"),
         } == 1i32,
         "Union Test failed"
     );

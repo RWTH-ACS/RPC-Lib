@@ -58,7 +58,7 @@ fn make_deserialize_function_code(union: &Union) -> TokenStream {
             }
 
             // Default-Case:
-            match_code = quote!( #match_code _ => Self :: CaseDefault, );
+            match_code = quote!( #match_code i => Self :: CaseDefault(i), );
         }
         DiscriminantType::UnsignedInt => panic!("Unsigned int as discriminant not implemented yet"),
         DiscriminantType::Boolean => panic!("Boolean as discriminant not implemented yet"),
@@ -97,7 +97,7 @@ fn make_len_function_code(union: &Union) -> TokenStream {
             }
             // Default-Case:
             match_arms = quote! { #match_arms
-                Self::CaseDefault => { 0 }
+                Self::CaseDefault(i) =>  XdrSerialize::len(i),
             };
         }
         DiscriminantType::UnsignedInt => panic!("Unsigned int as discriminant not implemented yet"),
@@ -135,7 +135,7 @@ fn make_serialization_function_code(union: &Union) -> TokenStream {
             }
             // Default-Case:
             match_arms = quote! { #match_arms
-                Self::CaseDefault => {}
+                Self::CaseDefault(i) => i32::serialize(&i, &mut writer)?,
             };
         }
         DiscriminantType::UnsignedInt => panic!("Unsigned int as discriminant not implemented yet"),
@@ -179,12 +179,25 @@ impl From<&Uniondef> for TokenStream {
         let serialization_func = make_serialization_function_code(&union_def.union_body);
         let len_func = make_len_function_code(&union_def.union_body);
 
+        let default_case = match union_def.union_body.discriminant {
+            DiscriminantType::Int => {
+                quote! {CaseDefault(i32)}
+            }
+            DiscriminantType::UnsignedInt => {
+                panic!("Unsigned int as discriminant not implemented yet")
+            }
+            DiscriminantType::Boolean => panic!("Boolean as discriminant not implemented yet"),
+            DiscriminantType::Enum { name: _ } => {
+                panic!("Enum as discriminant not implemented yet")
+            }
+        };
+
         // Paste together
         quote! {
             #[derive(Debug)]
             enum #name {
                 #union_body
-                CaseDefault,
+                #default_case
             }
 
             impl XdrDeserialize for #name {
@@ -427,14 +440,14 @@ mod tests {
         // Code-gen
         let rust_code: TokenStream = quote! {
             #[derive(Debug)]
-            enum MyUnion2 { Case0 { result: i32 }, Case2 { result: f32 }, CaseDefault, }
+            enum MyUnion2 { Case0 { result: i32 }, Case2 { result: f32 }, CaseDefault(i32) }
             impl XdrDeserialize for MyUnion2 {
                 fn deserialize(mut reader: impl ::std::io::Read) -> ::std::io::Result<Self> {
                     let err_code = i32::deserialize(&mut reader)?;
                     Ok(match err_code {
                         0i32 => Self::Case0 { result: <i32>::deserialize(&mut reader)? },
                         2i32 => Self::Case2 { result: <f32>::deserialize(&mut reader)? },
-                        _ => Self::CaseDefault,
+                        i => Self::CaseDefault(i),
                         _ => panic!("Unknown field of discriminated union with Field-Value {}", err_code),
                     })
                 }
@@ -448,7 +461,7 @@ mod tests {
                         Self::Case2 { result } => {
                             XdrSerialize::len(&2i32) + XdrSerialize::len(&result)
                         }
-                        Self::CaseDefault => { 0 }
+                        Self::CaseDefault(i) => XdrSerialize::len(i),
                     }
                 }
 
@@ -462,7 +475,7 @@ mod tests {
                             i32::serialize(&2i32, &mut writer)?;
                             <f32>::serialize(&result, &mut writer)?;
                         }
-                        Self::CaseDefault => { }
+                        Self::CaseDefault(i) => i32::serialize(&i, &mut writer)?,
                     }
                     Ok(())
                 }
