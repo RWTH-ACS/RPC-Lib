@@ -7,19 +7,57 @@
 // except according to those terms.
 
 use crate::parser::Rule;
+use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use super::declaration::Declaration;
+use super::datatype::DataType;
+use super::declaration::{Declaration, DeclarationType};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Structdef {
-    name: String,
-    struct_body: Struct,
+    pub name: String,
+    pub struct_body: Struct,
+    pub needs_lifetime: bool,
+}
+impl Structdef {
+    pub fn sliced_copy_required(&self, typedefs_with_lifetime: &HashSet<String>) -> bool {
+        for d in self.struct_body.fields.iter() {
+            if d.update_lifetime_required(typedefs_with_lifetime) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// creates a second struct suffixed with `_sliced` that uses slices instead of arrays for
+    /// zero-copy operations.
+    pub fn sliced_copy(&self, typedefs_with_lifetime: &HashSet<String>) -> Self {
+        let mut sliced = (*self).clone();
+        for d in sliced.struct_body.fields.iter_mut() {
+            match d.decl_type {
+                DeclarationType::VarlenArray => {
+                    d.decl_type = DeclarationType::ArraySlice;
+                    d.name.push_str("_sliced");
+                }
+                DeclarationType::TypeNameDecl => {
+                    if let DataType::TypeDef { name } = &mut d.data_type {
+                        if typedefs_with_lifetime.contains(name) {
+                            name.push_str("_sliced");
+                            d.needs_lifetime = true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        sliced.needs_lifetime = true;
+        sliced
+    }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Struct {
     pub fields: std::vec::Vec<Declaration>,
 }
@@ -71,6 +109,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Structdef {
         Structdef {
             name: name.as_str().to_string(),
             struct_body: Struct::from(struct_body),
+            needs_lifetime: false,
         }
     }
 }
@@ -116,11 +155,13 @@ mod tests {
                         signed: true,
                     },
                     name: "x".into(),
+                    needs_lifetime: false,
                 },
                 Declaration {
                     decl_type: DeclarationType::TypeNameDecl,
                     data_type: DataType::Float { length: 64 },
                     name: "f".into(),
+                    needs_lifetime: false,
                 },
             ],
         };
@@ -158,6 +199,7 @@ mod tests {
                         signed: false,
                     },
                     name: "x1_".into(),
+                    needs_lifetime: false,
                 },
                 Declaration {
                     decl_type: DeclarationType::TypeNameDecl,
@@ -165,6 +207,7 @@ mod tests {
                         name: "MyCustomType_2".into(),
                     },
                     name: "f".into(),
+                    needs_lifetime: false,
                 },
             ],
         };
@@ -204,11 +247,13 @@ mod tests {
                             signed: true,
                         },
                         name: "x".into(),
+                        needs_lifetime: false,
                     },
                     Declaration {
                         decl_type: DeclarationType::TypeNameDecl,
                         data_type: DataType::Float { length: 64 },
                         name: "f".into(),
+                        needs_lifetime: false,
                     },
                     Declaration {
                         decl_type: DeclarationType::TypeNameDecl,
@@ -216,9 +261,11 @@ mod tests {
                             name: "MyType".into(),
                         },
                         name: "t".into(),
+                        needs_lifetime: false,
                     },
                 ],
             },
+            needs_lifetime: false,
         };
         assert!(struct_def == st, "Struct Def wrong");
 
@@ -256,6 +303,7 @@ mod tests {
                     signed: true,
                 },
                 name: "x".into(),
+                needs_lifetime: false,
             }],
         };
         assert!(struct_body == st, "Struct Type Spec wrong");

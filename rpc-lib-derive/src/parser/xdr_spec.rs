@@ -6,6 +6,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use std::collections::HashSet;
+
+use crate::parser::declaration::DeclarationType;
 use crate::parser::Rule;
 
 use proc_macro2::TokenStream;
@@ -17,12 +20,51 @@ use super::structdef::Structdef;
 use super::typedef::Typedef;
 use super::uniondef::Uniondef;
 
+#[derive(Debug)]
 pub struct Specification {
     typedefs: std::vec::Vec<Typedef>,
     enums: std::vec::Vec<Enumdef>,
     structs: std::vec::Vec<Structdef>,
     unions: std::vec::Vec<Uniondef>,
     constants: std::vec::Vec<ConstantDeclaration>,
+}
+impl Specification {
+    /// Creates a copy of all datatypes that are of type [`DeclarationType::VarlenArray`]. These
+    /// can be used for zero-copy operation variants of functions.
+    fn create_sliced_variants(&mut self) {
+        // TODO: Nested typedefs are not handled
+        let mut vararray_typedefs: HashSet<String> = HashSet::new();
+        let sliced_typedefs: Vec<Typedef> = self
+            .typedefs
+            .iter()
+            .filter(|td| td.decl_type == DeclarationType::VarlenArray)
+            .map(|td| {
+                vararray_typedefs.insert(td.name.clone());
+                let mut sliced_td = (*td).clone();
+                sliced_td.decl_type = DeclarationType::ArraySlice;
+                sliced_td.name.push_str("_sliced");
+                sliced_td.needs_lifetime = true;
+                sliced_td
+            })
+            .collect();
+        self.typedefs.extend_from_slice(sliced_typedefs.as_slice());
+
+        let sliced_structs: Vec<Structdef> = self
+            .structs
+            .iter()
+            .filter(|s| s.sliced_copy_required(&vararray_typedefs))
+            .map(|s| s.sliced_copy(&vararray_typedefs))
+            .collect();
+        self.structs.extend(sliced_structs);
+
+        let sliced_unions: Vec<Uniondef> = self
+            .unions
+            .iter()
+            .filter(|u| u.sliced_copy_required(&vararray_typedefs))
+            .map(|u| u.sliced_copy(&vararray_typedefs))
+            .collect();
+        self.unions.extend(sliced_unions);
+    }
 }
 
 impl From<&Specification> for TokenStream {
@@ -81,6 +123,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Specification {
                 _ => eprintln!("Unknown Definition"),
             }
         }
+        spec.create_sliced_variants();
         spec
     }
 }

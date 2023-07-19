@@ -9,47 +9,72 @@
 use crate::parser::Rule;
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
+use std::collections::HashSet;
 
 use super::constant::Value;
 use super::datatype::DataType;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum DeclarationType {
     Optional,
     VarlenArray,
+    ArraySlice,
     FixedlenArray { length: Value },
     TypeNameDecl,
     VoidDecl,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Declaration {
     pub decl_type: DeclarationType,
     pub data_type: DataType, // e.g. int(-array), (optional)char, (varlen-)double
     pub name: String,
+    pub needs_lifetime: bool,
 }
+impl Declaration {
+    pub fn update_lifetime_required(&self, typedefs_with_lifetime: &HashSet<String>) -> bool {
+        match self.decl_type {
+            DeclarationType::ArraySlice => true,
+            DeclarationType::TypeNameDecl => {
+                if let DataType::TypeDef { name } = &self.data_type {
+                    typedefs_with_lifetime.contains(name)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
 
-pub fn decl_type_to_rust(decl_type: &DeclarationType, data_type: &DataType) -> TokenStream {
-    let data_type: TokenStream = data_type.into();
-    match &decl_type {
-        DeclarationType::Optional => {
-            quote!(std::Option<#data_type>)
-        }
-        DeclarationType::VarlenArray => {
-            quote!(std::vec::Vec<#data_type>)
-        }
-        DeclarationType::FixedlenArray { length } => {
-            let len = match length {
-                Value::Numeric { val } => usize::try_from(*val).unwrap().to_token_stream(),
-                Value::Named { name } => name.to_token_stream(),
-            };
-            quote!([#data_type; #len])
-        }
-        DeclarationType::TypeNameDecl => {
-            quote!(#data_type)
-        }
-        DeclarationType::VoidDecl => {
-            quote!()
+    pub fn to_rust_tokens(&self) -> TokenStream {
+        let data_type: TokenStream = (&self.data_type).into();
+        match &self.decl_type {
+            DeclarationType::Optional => {
+                quote!(std::Option<#data_type>)
+            }
+            DeclarationType::VarlenArray => {
+                quote!(std::vec::Vec<#data_type>)
+            }
+            DeclarationType::ArraySlice => {
+                quote!(&'a mut [#data_type])
+            }
+            DeclarationType::FixedlenArray { length } => {
+                let len = match length {
+                    Value::Numeric { val } => usize::try_from(*val).unwrap().to_token_stream(),
+                    Value::Named { name } => name.to_token_stream(),
+                };
+                quote!([#data_type; #len])
+            }
+            DeclarationType::TypeNameDecl => {
+                if self.needs_lifetime {
+                    quote!(#data_type <'a> )
+                } else {
+                    quote!(#data_type)
+                }
+            }
+            DeclarationType::VoidDecl => {
+                quote!()
+            }
         }
     }
 }
@@ -57,7 +82,7 @@ pub fn decl_type_to_rust(decl_type: &DeclarationType, data_type: &DataType) -> T
 impl From<&Declaration> for TokenStream {
     fn from(decl: &Declaration) -> TokenStream {
         let name = quote::format_ident!("{}", decl.name);
-        let decl_type_code = decl_type_to_rust(&decl.decl_type, &decl.data_type);
+        let decl_type_code = decl.to_rust_tokens();
         if decl.decl_type != DeclarationType::VoidDecl {
             quote!( #name: #decl_type_code )
         } else {
@@ -75,6 +100,7 @@ fn parse_optional(pointer: pest::iterators::Pair<'_, Rule>) -> Declaration {
         decl_type: DeclarationType::Optional,
         data_type: DataType::from(optional_type),
         name: optional_name.as_str().to_string(),
+        needs_lifetime: false,
     }
 }
 
@@ -87,6 +113,7 @@ fn parse_varlen_array(varlen_array: pest::iterators::Pair<'_, Rule>) -> Declarat
         decl_type: DeclarationType::VarlenArray,
         data_type: DataType::from(varlen_type),
         name: varlen_name.as_str().to_string(),
+        needs_lifetime: false,
     }
 }
 
@@ -101,6 +128,7 @@ fn parse_fixedlen_array(fixedlen_array: pest::iterators::Pair<'_, Rule>) -> Decl
         },
         data_type: DataType::from(fixedlen_type),
         name: fixedlen_name.as_str().to_string(),
+        needs_lifetime: false,
     }
 }
 
@@ -110,6 +138,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Declaration {
             decl_type: DeclarationType::VoidDecl,
             data_type: DataType::Void,
             name: "".to_string(),
+            needs_lifetime: false,
         };
         // declaration > inner_rule (e.g. pointer, string_decl, varlen_array)
         let inner_token = declaration.into_inner().next().unwrap();
@@ -125,6 +154,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Declaration {
                     decl_type: DeclarationType::TypeNameDecl,
                     data_type: DataType::String,
                     name: name.to_string(),
+                    needs_lifetime: false,
                 };
             }
             Rule::varlen_array => {
@@ -153,6 +183,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Declaration {
                     decl_type: DeclarationType::VoidDecl,
                     data_type: DataType::Void,
                     name: "".to_string(),
+                    needs_lifetime: false,
                 };
             }
             _ => eprintln!("Syntax error"),
@@ -179,6 +210,7 @@ mod tests {
                 signed: false,
             },
             name: "array".to_string(),
+            needs_lifetime: false,
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
 
@@ -204,6 +236,7 @@ mod tests {
                 length: 64,
                 signed: true,
             },
+            needs_lifetime: false,
             name: "array2_".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
@@ -229,6 +262,7 @@ mod tests {
             data_type: DataType::TypeDef {
                 name: "CustomType".to_string(),
             },
+            needs_lifetime: false,
             name: "_XR234z".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
@@ -257,6 +291,7 @@ mod tests {
                 length: 32,
                 signed: true,
             },
+            needs_lifetime: false,
             name: "arr".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
@@ -284,6 +319,7 @@ mod tests {
             data_type: DataType::TypeDef {
                 name: "CustomType".to_string(),
             },
+            needs_lifetime: false,
             name: "_XR234z".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
@@ -309,6 +345,7 @@ mod tests {
             data_type: DataType::TypeDef {
                 name: "CustomType".to_string(),
             },
+            needs_lifetime: false,
             name: "name_23Z".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
@@ -332,6 +369,7 @@ mod tests {
         let decl_coded = Declaration {
             decl_type: DeclarationType::TypeNameDecl,
             data_type: DataType::String,
+            needs_lifetime: false,
             name: "x".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
@@ -355,6 +393,7 @@ mod tests {
         let decl_coded = Declaration {
             decl_type: DeclarationType::TypeNameDecl,
             data_type: DataType::String,
+            needs_lifetime: false,
             name: "_2x".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
@@ -380,6 +419,7 @@ mod tests {
             data_type: DataType::TypeDef {
                 name: "CustomType".to_string(),
             },
+            needs_lifetime: false,
             name: "name_23Z".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");
@@ -406,6 +446,7 @@ mod tests {
                 length: 64,
                 signed: false,
             },
+            needs_lifetime: false,
             name: "Optional_2_Int".to_string(),
         };
         assert!(decl_generated == decl_coded, "Declaration parsing wrong");

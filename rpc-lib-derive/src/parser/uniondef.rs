@@ -6,8 +6,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::parser::declaration::decl_type_to_rust;
 use crate::parser::Rule;
+use std::collections::HashSet;
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -16,23 +16,62 @@ use super::constant::Value;
 use super::datatype::DataType;
 use super::declaration::{Declaration, DeclarationType};
 
-#[derive(PartialEq)]
-enum DiscriminantType {
+#[derive(PartialEq, Clone, Debug)]
+pub(crate) enum DiscriminantType {
     Int,
     UnsignedInt,
     Boolean,
     Enum { name: String },
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Uniondef {
     name: String,
     union_body: Union,
+    needs_lifetime: bool,
+}
+impl Uniondef {
+    /// Checks if the Union contains [`DeclarationType::VarlenArrays`], so that a copy utilizing
+    /// slices for zero-copy operations is meaninful.
+    pub fn sliced_copy_required(&self, typedefs_with_lifetime: &HashSet<String>) -> bool {
+        for (_v, d) in self.union_body.cases.iter() {
+            if d.update_lifetime_required(typedefs_with_lifetime) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// creates a second struct suffixed with `_sliced` that uses slices instead of arrays for
+    /// zero-copy operations.
+    pub fn sliced_copy(&self, typedefs_with_lifetime: &HashSet<String>) -> Self {
+        let mut sliced = (*self).clone();
+        for (_v, d) in sliced.union_body.cases.iter_mut() {
+            match d.decl_type {
+                DeclarationType::VarlenArray => {
+                    d.decl_type = DeclarationType::ArraySlice;
+                    d.name.push_str("_sliced");
+                }
+                DeclarationType::TypeNameDecl => {
+                    if let DataType::TypeDef { name } = &mut d.data_type {
+                        if typedefs_with_lifetime.contains(name) {
+                            name.push_str("_sliced");
+                            d.needs_lifetime = true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        sliced.name.push_str("_sliced");
+        sliced.needs_lifetime = true;
+        sliced
+    }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Union {
-    discriminant: DiscriminantType,
+    pub(crate) discriminant: DiscriminantType,
     cases: std::vec::Vec<(Value, Declaration)>,
     default: std::boxed::Box<Declaration>,
 }
@@ -50,7 +89,7 @@ fn make_deserialize_function_code(union: &Union) -> TokenStream {
                 let case_ident = format_ident!("Case{}", number as u32);
                 if data_decl.decl_type != DeclarationType::VoidDecl {
                     let name = quote::format_ident!("{}", data_decl.name);
-                    let decl_type = decl_type_to_rust(&data_decl.decl_type, &data_decl.data_type);
+                    let decl_type = data_decl.to_rust_tokens();
                     match_code = quote!( #match_code #number => Self :: #case_ident { #name: <#decl_type>::deserialize(&mut reader)? }, );
                 } else {
                     match_code = quote!( #match_code #number => Self :: #case_ident, );
@@ -125,7 +164,7 @@ fn make_serialization_function_code(union: &Union) -> TokenStream {
                 } as i32;
                 let case_ident = format_ident!("Case{}", number as u32);
                 let decl_name = format_ident!("{}", data_decl.name);
-                let decl_type = decl_type_to_rust(&data_decl.decl_type, &data_decl.data_type);
+                let decl_type = data_decl.to_rust_tokens();
                 match_arms = quote! { #match_arms
                     Self :: #case_ident { #decl_name } => {
                         i32::serialize(&#number, &mut writer)?;
@@ -192,23 +231,36 @@ impl From<&Uniondef> for TokenStream {
             }
         };
 
+        let lt = if union_def.needs_lifetime {
+            quote! { <'a>}
+        } else {
+            quote! {}
+        };
+        let serde_code = if union_def.needs_lifetime {
+            quote!()
+        } else {
+            quote!(
+                impl XdrDeserialize for #name {
+                    #deserialization_func
+                }
+
+                impl XdrSerialize for #name {
+                    #len_func
+
+                    #serialization_func
+                }
+            )
+        };
+
         // Paste together
         quote! {
             #[derive(Debug)]
-            enum #name {
+            enum #name #lt {
                 #union_body
                 #default_case
             }
 
-            impl XdrDeserialize for #name {
-                #deserialization_func
-            }
-
-            impl XdrSerialize for #name {
-                #len_func
-
-                #serialization_func
-            }
+            #serde_code
         }
     }
 }
@@ -225,6 +277,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Uniondef {
         Uniondef {
             name: name.as_str().to_string(),
             union_body: Union::from(union_body),
+            needs_lifetime: false,
         }
     }
 }
@@ -245,6 +298,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Union {
                 decl_type: DeclarationType::VoidDecl,
                 data_type: DataType::Void,
                 name: "".into(),
+                needs_lifetime: false,
             }),
         };
         for token in union_body.into_inner() {
@@ -318,6 +372,7 @@ mod tests {
                 decl_type: DeclarationType::VoidDecl,
                 data_type: DataType::Void,
                 name: "".into(),
+                needs_lifetime: false,
             }),
         };
         assert!(union_generated == union_coded, "Union parsing wrong");
@@ -335,6 +390,7 @@ mod tests {
         let union_generated = Uniondef::from(parsed.next().unwrap());
         let union_coded = Uniondef {
             name: "MyUnion".to_string(),
+            needs_lifetime: false,
             union_body: Union {
                 discriminant: DiscriminantType::UnsignedInt,
                 cases: vec![(
@@ -349,6 +405,7 @@ mod tests {
                 default: std::boxed::Box::new(Declaration {
                     decl_type: DeclarationType::VoidDecl,
                     data_type: DataType::Void,
+                    needs_lifetime: false,
                     name: "".into(),
                 }),
             },
@@ -387,6 +444,7 @@ mod tests {
                         length: 32,
                         signed: true,
                     },
+                    needs_lifetime: false,
                     name: "y".into(),
                 },
             )],
@@ -394,6 +452,7 @@ mod tests {
                 decl_type: DeclarationType::VoidDecl,
                 data_type: DataType::Void,
                 name: "".into(),
+                needs_lifetime: false,
             }),
         };
         assert!(un == union_body, "Union Spec wrong");
@@ -406,6 +465,7 @@ mod tests {
         let union_generated = Uniondef::from(parsed.next().unwrap());
         let union_coded = Uniondef {
             name: "MyUnion2".to_string(),
+            needs_lifetime: false,
             union_body: Union {
                 discriminant: DiscriminantType::Int,
                 cases: vec![
@@ -432,6 +492,7 @@ mod tests {
                     decl_type: DeclarationType::VoidDecl,
                     data_type: DataType::Void,
                     name: "".into(),
+                    needs_lifetime: false,
                 }),
             },
         };

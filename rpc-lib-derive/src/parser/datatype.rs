@@ -14,7 +14,7 @@ use super::enumdef::{parse_enum_type_spec, Enum};
 use super::structdef::{parse_struct_type_spec, Struct};
 use super::uniondef::{parse_union_type_spec, Union};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum DataType {
     Integer { length: u32, signed: bool },
     Float { length: u32 },

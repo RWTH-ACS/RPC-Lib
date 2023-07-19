@@ -11,13 +11,13 @@ use crate::parser::Rule;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct ConstantDeclaration {
     name: String,
     value: Value,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Value {
     Numeric { val: i64 },
     Named { name: String },

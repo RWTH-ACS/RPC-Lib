@@ -12,20 +12,33 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use super::datatype::DataType;
-use super::declaration::{decl_type_to_rust, Declaration, DeclarationType};
+use super::declaration::{Declaration, DeclarationType};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Typedef {
-    name: String,
-    orig_type: DataType,
-    decl_type: DeclarationType,
+    pub name: String,
+    pub orig_type: DataType,
+    pub decl_type: DeclarationType,
+    pub needs_lifetime: bool,
 }
 
 impl From<&Typedef> for TokenStream {
     fn from(type_def: &Typedef) -> TokenStream {
-        let type_code = decl_type_to_rust(&type_def.decl_type, &type_def.orig_type);
+        // Decl and Typedef are basically the same. Workaround to use `to_rust_tokens`.
+        let tmp_decl = Declaration {
+            name: type_def.name.clone(),
+            data_type: type_def.orig_type.clone(),
+            decl_type: type_def.decl_type.clone(),
+            needs_lifetime: type_def.needs_lifetime,
+        };
+        let type_code = tmp_decl.to_rust_tokens();
+        let lt = if type_def.needs_lifetime {
+            quote! { <'a>}
+        } else {
+            quote! {}
+        };
         let name = quote::format_ident!("{}", type_def.name);
-        quote!(type #name = #type_code;)
+        quote!(type #name #lt = #type_code ;)
     }
 }
 
@@ -33,10 +46,12 @@ impl From<pest::iterators::Pair<'_, Rule>> for Typedef {
     fn from(type_def: pest::iterators::Pair<'_, Rule>) -> Typedef {
         let decl_token = type_def.into_inner().next().unwrap();
         let decl = Declaration::from(decl_token);
+        let needs_lifetime = decl.decl_type == DeclarationType::ArraySlice;
         Typedef {
             orig_type: decl.data_type,
             decl_type: decl.decl_type,
             name: decl.name,
+            needs_lifetime,
         }
     }
 }
@@ -60,6 +75,7 @@ mod tests {
                 signed: false,
             },
             decl_type: DeclarationType::TypeNameDecl,
+            needs_lifetime: false,
         };
         assert!(typedef_generated == typedef_coded, "Typedef parsing wrong");
 
@@ -87,6 +103,7 @@ mod tests {
                 name: "char".to_string(),
             },
             decl_type: DeclarationType::VarlenArray,
+            needs_lifetime: false,
         };
         assert!(typedef_generated == typedef_coded, "Typedef parsing wrong");
 
@@ -114,6 +131,7 @@ mod tests {
                 name: "opaque".to_string(),
             },
             decl_type: DeclarationType::VarlenArray,
+            needs_lifetime: false,
         };
         assert!(typedef_generated == typedef_coded, "Typedef parsing wrong");
 

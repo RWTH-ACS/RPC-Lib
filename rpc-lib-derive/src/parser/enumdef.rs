@@ -13,13 +13,13 @@ use quote::{format_ident, quote};
 
 use super::constant::Value;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct Enumdef {
     name: String,
     enum_body: Enum,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Enum {
     pub cases: std::vec::Vec<(String, Value)>,
 }
