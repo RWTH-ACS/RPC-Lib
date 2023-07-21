@@ -19,16 +19,17 @@ use super::declaration::{Declaration, DeclarationType};
 pub struct Structdef {
     pub name: String,
     pub struct_body: Struct,
-    pub needs_lifetime: bool,
+    pub contains_vararray: bool,
+    pub requires_lifetime: bool,
 }
 impl Structdef {
-    pub fn sliced_copy_required(&self, typedefs_with_lifetime: &HashSet<String>) -> bool {
+    pub fn update_contains_vararray(&mut self, typedefs_with_vararray: &HashSet<String>) {
+        self.contains_vararray = false;
         for d in self.struct_body.fields.iter() {
-            if d.update_lifetime_required(typedefs_with_lifetime) {
-                return true;
+            if d.update_contains_vararray(typedefs_with_vararray) {
+                self.contains_vararray = true
             }
         }
-        false
     }
 
     /// creates a second struct suffixed with `_sliced` that uses slices instead of arrays for
@@ -52,7 +53,7 @@ impl Structdef {
                 _ => {}
             }
         }
-        sliced.needs_lifetime = true;
+        sliced.requires_lifetime = true;
         sliced
     }
 }
@@ -109,7 +110,8 @@ impl From<pest::iterators::Pair<'_, Rule>> for Structdef {
         Structdef {
             name: name.as_str().to_string(),
             struct_body: Struct::from(struct_body),
-            needs_lifetime: false,
+            contains_vararray: false,
+            requires_lifetime: false,
         }
     }
 }
@@ -238,6 +240,7 @@ mod tests {
 
         let st = Structdef {
             name: "MyStruct_".to_string(),
+            requires_lifetime: false,
             struct_body: Struct {
                 fields: vec![
                     Declaration {
@@ -265,7 +268,7 @@ mod tests {
                     },
                 ],
             },
-            needs_lifetime: false,
+            contains_vararray: false,
         };
         assert!(struct_def == st, "Struct Def wrong");
 

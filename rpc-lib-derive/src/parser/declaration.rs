@@ -32,7 +32,7 @@ pub struct Declaration {
     pub needs_lifetime: bool,
 }
 impl Declaration {
-    pub fn update_lifetime_required(&self, typedefs_with_lifetime: &HashSet<String>) -> bool {
+    pub fn update_contains_vararray(&self, typedefs_with_lifetime: &HashSet<String>) -> bool {
         match self.decl_type {
             DeclarationType::ArraySlice => true,
             DeclarationType::TypeNameDecl => {

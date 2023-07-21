@@ -45,6 +45,7 @@ pub use rpc_lib_derive::include_rpcl;
 pub use rpc_lib_derive::{XdrDeserialize, XdrSerialize};
 
 pub use crate::rpc_struct::rpc_clnt::clnt_create;
+pub use crate::rpc_struct::rpc_clnt::RawResponseUnion;
 pub use crate::rpc_struct::rpc_clnt::RpcClient;
 
 pub use crate::rpc_struct::xdr::{XdrDeserialize, XdrSerialize};

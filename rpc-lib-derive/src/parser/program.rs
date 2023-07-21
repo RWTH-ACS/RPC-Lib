@@ -6,12 +6,17 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::parser::xdr_spec::ResolvedType;
 use crate::parser::Rule;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use super::procedure::Procedure;
+use super::datatype::DataType;
+use super::procedure::{Procedure, RawCallType};
+use super::uniondef::DiscriminantType;
+use super::xdr_spec::Specification;
 
+#[derive(Debug)]
 pub struct Program {
     pub program_number: u32,
     pub versions: std::vec::Vec<Version>,
@@ -59,9 +64,36 @@ impl From<pest::iterators::Pair<'_, Rule>> for Program {
     }
 }
 
+#[derive(Debug)]
 pub struct Version {
     pub version_number: u32,
     procedures: std::vec::Vec<Procedure>,
+}
+impl Version {
+    pub fn create_sliced_variants(&mut self, spec: &Specification) {
+        let mut sliced_procedures = Vec::new();
+        for p in &self.procedures {
+            match &p.return_type {
+                DataType::TypeDef { name } => match spec.get_type_specification(name) {
+                    Some(ResolvedType::Union(u)) => {
+                        if u.contains_vararray && u.union_body.discriminant == DiscriminantType::Int
+                        {
+                            let mut sliced_proc = p.clone();
+                            sliced_proc.name.push_str("_raw");
+                            sliced_proc.slice_call_target_type = Some(RawCallType::UnionI32);
+                            sliced_proc.return_type = DataType::Void;
+                            sliced_procedures.push(sliced_proc);
+                        }
+                    }
+                    // sliced variants for structs or enums are not yet supported
+                    _ => {}
+                },
+                // sliced variants for Anonymous structs or unions are not yet supported
+                _ => {}
+            }
+        }
+        self.procedures.extend(sliced_procedures);
+    }
 }
 
 impl From<&Version> for TokenStream {

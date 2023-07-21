@@ -32,33 +32,50 @@ pub fn parse(x_file: &str, struct_name: &str) -> (TokenStream, u32, u32) {
     let parsed = RPCLParser::parse(Rule::file, x_file).expect("Syntax Error in .x-File");
     let s_name = quote::format_ident!("{}", struct_name);
 
-    let mut program_number = 0;
-    let mut version_number = 0;
-
     let mut code = quote!();
+
+    let mut spec = None;
+    let mut program = None;
     for token in parsed {
         match token.as_rule() {
             Rule::specification => {
-                let spec = Specification::from(token);
-                let spec_code = TokenStream::from(&spec);
-                code = quote!(#code #spec_code);
+                if spec.is_some() {
+                    unimplemented!("Separate spec sections are unimplemented. One would have to merge the two datastructs here...");
+                }
+                spec = Some(Specification::from(token));
             }
             Rule::program_def => {
-                let program = Program::from(token);
-                program_number = program.program_number;
-                version_number = program.versions[0].version_number;
-                let proc_code = TokenStream::from(&program);
-                code = quote! {
-                    #code
-                    use rpc_lib::{XdrDeserialize, XdrSerialize};
-                    impl #s_name {
-                        #proc_code
-                    }
-                };
+                program = Some(Program::from(token));
             }
             _ => {}
         }
     }
+
+    let mut program = program.expect("rpcl file without program is invalid");
+    if let Some(spec) = &mut spec {
+        spec.update_contains_vararray();
+        program
+            .versions
+            .iter_mut()
+            .for_each(|v| v.create_sliced_variants(&spec));
+    }
+    let program_number = program.program_number;
+    let version_number = program.versions[0].version_number;
+
+    let spec_code = if let Some(spec) = spec {
+        TokenStream::from(&spec)
+    } else {
+        quote!()
+    };
+    let proc_code = TokenStream::from(&program);
+    code = quote! {
+        #code
+        #spec_code
+        use rpc_lib::{XdrDeserialize, XdrSerialize};
+        impl #s_name {
+            #proc_code
+        }
+    };
     (code, program_number, version_number)
 }
 

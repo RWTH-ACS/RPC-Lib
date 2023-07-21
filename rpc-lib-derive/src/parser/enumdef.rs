@@ -15,7 +15,7 @@ use super::constant::Value;
 
 #[derive(PartialEq, Debug)]
 pub struct Enumdef {
-    name: String,
+    pub name: String,
     enum_body: Enum,
 }
 

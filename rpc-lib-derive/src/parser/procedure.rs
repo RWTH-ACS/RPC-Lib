@@ -13,12 +13,20 @@ use quote::{format_ident, quote};
 use super::constant::Value;
 use super::datatype::DataType;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum RawCallType {
+    UnionI32,
+    Struct,
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub struct Procedure {
-    name: String,
-    return_type: DataType,
-    args: std::vec::Vec<DataType>,
-    num: Value,
+    pub name: String,
+    pub return_type: DataType,
+    // bool stands for mutability
+    pub args: std::vec::Vec<DataType>,
+    pub num: Value,
+    pub slice_call_target_type: Option<RawCallType>,
 }
 
 impl From<&Procedure> for TokenStream {
@@ -81,13 +89,24 @@ impl From<&Procedure> for TokenStream {
         };
 
         let proc_num = TokenStream::from(&proc.num);
-        if proc.return_type == DataType::Void {
-            quote! { fn #proc_name(&self, #arg_defs) {}}
+        if let Some(slice_target) = &proc.slice_call_target_type {
+            match slice_target {
+                RawCallType::UnionI32 => {
+                    quote! { fn #proc_name <'a> (&mut self, target: &'a mut rpc_lib::RawResponseUnion<'a, i32>, #arg_defs ) -> std::io::Result<()> {
+                        self.client.call_with_raw_union_response(#proc_num as u32, #arg, target)
+                    }}
+                }
+                _ => unimplemented!("raw_return values are only supported for unions and typedefs"),
+            }
         } else {
-            let return_type = TokenStream::from(&proc.return_type);
-            quote! { fn #proc_name(&mut self, #arg_defs) -> std::io::Result<#return_type> {
-                self.client.call(#proc_num as u32, #arg)
-            }}
+            if proc.return_type == DataType::Void {
+                quote! { fn #proc_name(&self, #arg_defs) {}}
+            } else {
+                let return_type = TokenStream::from(&proc.return_type);
+                quote! { fn #proc_name(&mut self, #arg_defs) -> std::io::Result<#return_type> {
+                    self.client.call(#proc_num as u32, #arg)
+                }}
+            }
         }
     }
 }
@@ -112,6 +131,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Procedure {
             return_type: DataType::from(proc_return.into_inner().next().unwrap()),
             args: arg_vec,
             num: Value::from(proc_num),
+            slice_call_target_type: None,
         }
     }
 }
@@ -139,6 +159,7 @@ mod tests {
                 DataType::Float { length: 32 },
             ],
             num: Value::Numeric { val: 1 },
+            slice_call_target_type: None,
         };
         assert!(proc_generated == proc_coded, "Procedure parsing wrong");
 
@@ -178,6 +199,7 @@ mod tests {
             return_type: DataType::Void,
             args: vec![],
             num: Value::Numeric { val: 36 },
+            slice_call_target_type: None,
         };
         assert!(proc_generated == proc_coded, "Procedure parsing wrong");
 

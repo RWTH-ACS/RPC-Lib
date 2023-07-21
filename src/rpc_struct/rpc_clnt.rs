@@ -178,6 +178,17 @@ impl RpcClient {
         self.recv()
     }
 
+    /// Makes a RPC call. Doesn't processes the response but writes it into `resp`.
+    pub fn call_with_raw_union_response<'a>(
+        &mut self,
+        procedure: u32,
+        args: impl XdrSerialize,
+        resp: &'a mut RawResponseUnion<'a, i32>,
+    ) -> io::Result<()> {
+        self.send_request(procedure, args)?;
+        self.recv_raw_union(resp)
+    }
+
     fn send_request(&mut self, procedure: u32, args: impl XdrSerialize) -> io::Result<()> {
         let request = RpcRequest {
             header: RpcCall {
@@ -208,6 +219,26 @@ impl RpcClient {
         let _rpc_reply = RpcReply::deserialize(&mut reader)?;
         XdrDeserialize::deserialize(&mut reader)
     }
+
+    fn recv_raw_union<'a>(&mut self, target: &'a mut RawResponseUnion<'a, i32>) -> io::Result<()> {
+        // TODO: This is very crude and needs improvements
+        let mut reader = FragmentReader::new(&mut self.reader);
+        let _rpc_reply = RpcReply::deserialize(&mut reader)?;
+        let discriminant = i32::deserialize(&mut reader)?;
+        *target.discriminant = discriminant;
+        let data_len_internal = i32::deserialize(&mut reader)?;
+        reader.read_exact(target.data)?;
+        assert_eq!(data_len_internal as usize, target.data.len());
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+/// Raw data from a RPC response. Used for zero-copy responses.
+pub struct RawResponseUnion<'a, DISCRIMINANT> {
+    pub discriminant: &'a mut DISCRIMINANT,
+    pub data_length: &'a mut usize,
+    pub data: &'a mut [u8],
 }
 
 struct FragmentReader<R> {

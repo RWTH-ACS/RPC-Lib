@@ -26,20 +26,21 @@ pub(crate) enum DiscriminantType {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Uniondef {
-    name: String,
-    union_body: Union,
-    needs_lifetime: bool,
+    pub name: String,
+    pub union_body: Union,
+    pub contains_vararray: bool,
+    pub requires_lifetime: bool,
 }
 impl Uniondef {
     /// Checks if the Union contains [`DeclarationType::VarlenArrays`], so that a copy utilizing
     /// slices for zero-copy operations is meaninful.
-    pub fn sliced_copy_required(&self, typedefs_with_lifetime: &HashSet<String>) -> bool {
+    pub fn update_contains_vararray(&mut self, typedefs_with_vararray: &HashSet<String>) {
+        self.contains_vararray = false;
         for (_v, d) in self.union_body.cases.iter() {
-            if d.update_lifetime_required(typedefs_with_lifetime) {
-                return true;
+            if d.update_contains_vararray(typedefs_with_vararray) {
+                self.contains_vararray = true
             }
         }
-        false
     }
 
     /// creates a second struct suffixed with `_sliced` that uses slices instead of arrays for
@@ -64,7 +65,7 @@ impl Uniondef {
             }
         }
         sliced.name.push_str("_sliced");
-        sliced.needs_lifetime = true;
+        sliced.requires_lifetime = true;
         sliced
     }
 }
@@ -231,12 +232,12 @@ impl From<&Uniondef> for TokenStream {
             }
         };
 
-        let lt = if union_def.needs_lifetime {
+        let lt = if union_def.requires_lifetime {
             quote! { <'a>}
         } else {
             quote! {}
         };
-        let serde_code = if union_def.needs_lifetime {
+        let serde_code = if union_def.requires_lifetime {
             quote!()
         } else {
             quote!(
@@ -277,7 +278,8 @@ impl From<pest::iterators::Pair<'_, Rule>> for Uniondef {
         Uniondef {
             name: name.as_str().to_string(),
             union_body: Union::from(union_body),
-            needs_lifetime: false,
+            contains_vararray: false,
+            requires_lifetime: false,
         }
     }
 }
@@ -390,7 +392,8 @@ mod tests {
         let union_generated = Uniondef::from(parsed.next().unwrap());
         let union_coded = Uniondef {
             name: "MyUnion".to_string(),
-            needs_lifetime: false,
+            contains_vararray: false,
+            requires_lifetime: false,
             union_body: Union {
                 discriminant: DiscriminantType::UnsignedInt,
                 cases: vec![(
@@ -465,7 +468,8 @@ mod tests {
         let union_generated = Uniondef::from(parsed.next().unwrap());
         let union_coded = Uniondef {
             name: "MyUnion2".to_string(),
-            needs_lifetime: false,
+            contains_vararray: false,
+            requires_lifetime: false,
             union_body: Union {
                 discriminant: DiscriminantType::Int,
                 cases: vec![

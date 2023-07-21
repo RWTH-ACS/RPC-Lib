@@ -46,12 +46,12 @@ impl From<pest::iterators::Pair<'_, Rule>> for Typedef {
     fn from(type_def: pest::iterators::Pair<'_, Rule>) -> Typedef {
         let decl_token = type_def.into_inner().next().unwrap();
         let decl = Declaration::from(decl_token);
-        let needs_lifetime = decl.decl_type == DeclarationType::ArraySlice;
+        let contains_vararray = decl.decl_type == DeclarationType::ArraySlice;
         Typedef {
             orig_type: decl.data_type,
             decl_type: decl.decl_type,
             name: decl.name,
-            needs_lifetime,
+            needs_lifetime: contains_vararray,
         }
     }
 }

@@ -20,6 +20,13 @@ use super::structdef::Structdef;
 use super::typedef::Typedef;
 use super::uniondef::Uniondef;
 
+pub enum ResolvedType<'a> {
+    Struct(&'a Structdef),
+    Union(&'a Uniondef),
+    Enum(&'a Enumdef),
+    // TODO: Consts as well?
+}
+
 #[derive(Debug)]
 pub struct Specification {
     typedefs: std::vec::Vec<Typedef>,
@@ -27,11 +34,12 @@ pub struct Specification {
     structs: std::vec::Vec<Structdef>,
     unions: std::vec::Vec<Uniondef>,
     constants: std::vec::Vec<ConstantDeclaration>,
+    pub union_typedefs_with_vararray: HashSet<String>,
 }
 impl Specification {
     /// Creates a copy of all datatypes that are of type [`DeclarationType::VarlenArray`]. These
     /// can be used for zero-copy operation variants of functions.
-    fn create_sliced_variants(&mut self) {
+    pub fn update_contains_vararray(&mut self) {
         // TODO: Nested typedefs are not handled
         let mut vararray_typedefs: HashSet<String> = HashSet::new();
         let sliced_typedefs: Vec<Typedef> = self
@@ -49,21 +57,50 @@ impl Specification {
             .collect();
         self.typedefs.extend_from_slice(sliced_typedefs.as_slice());
 
+        self.structs
+            .iter_mut()
+            .for_each(|s| s.update_contains_vararray(&vararray_typedefs));
+
         let sliced_structs: Vec<Structdef> = self
             .structs
             .iter()
-            .filter(|s| s.sliced_copy_required(&vararray_typedefs))
+            .filter(|s| s.contains_vararray)
             .map(|s| s.sliced_copy(&vararray_typedefs))
             .collect();
         self.structs.extend(sliced_structs);
 
+        self.unions
+            .iter_mut()
+            .for_each(|u| u.update_contains_vararray(&vararray_typedefs));
         let sliced_unions: Vec<Uniondef> = self
             .unions
             .iter()
-            .filter(|u| u.sliced_copy_required(&vararray_typedefs))
-            .map(|u| u.sliced_copy(&vararray_typedefs))
+            .filter(|u| u.contains_vararray)
+            .map(|u| {
+                self.union_typedefs_with_vararray.insert(u.name.clone());
+                u.sliced_copy(&vararray_typedefs)
+            })
             .collect();
         self.unions.extend(sliced_unions);
+    }
+
+    pub fn get_type_specification<'a>(&'a self, name: &str) -> Option<ResolvedType<'a>> {
+        for s in &self.structs {
+            if &s.name == name {
+                return Some(ResolvedType::Struct(s));
+            }
+        }
+        for u in &self.unions {
+            if &u.name == name {
+                return Some(ResolvedType::Union(u));
+            }
+        }
+        for e in &self.enums {
+            if &e.name == name {
+                return Some(ResolvedType::Enum(e));
+            }
+        }
+        None
     }
 }
 
@@ -102,6 +139,7 @@ impl From<pest::iterators::Pair<'_, Rule>> for Specification {
             structs: std::vec::Vec::new(),
             unions: std::vec::Vec::new(),
             constants: std::vec::Vec::new(),
+            union_typedefs_with_vararray: HashSet::new(),
         };
         for definition in specification.into_inner() {
             match definition.as_rule() {
@@ -123,7 +161,6 @@ impl From<pest::iterators::Pair<'_, Rule>> for Specification {
                 _ => eprintln!("Unknown Definition"),
             }
         }
-        spec.create_sliced_variants();
         spec
     }
 }
