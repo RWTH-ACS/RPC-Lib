@@ -98,15 +98,13 @@ impl From<&Procedure> for TokenStream {
                 }
                 _ => unimplemented!("raw_return values are only supported for unions and typedefs"),
             }
+        } else if proc.return_type == DataType::Void {
+            quote! { fn #proc_name(&self, #arg_defs) {}}
         } else {
-            if proc.return_type == DataType::Void {
-                quote! { fn #proc_name(&self, #arg_defs) {}}
-            } else {
-                let return_type = TokenStream::from(&proc.return_type);
-                quote! { fn #proc_name(&mut self, #arg_defs) -> std::io::Result<#return_type> {
-                    self.client.call(#proc_num as u32, #arg)
-                }}
-            }
+            let return_type = TokenStream::from(&proc.return_type);
+            quote! { fn #proc_name(&mut self, #arg_defs) -> std::io::Result<#return_type> {
+                self.client.call(#proc_num as u32, #arg)
+            }}
         }
     }
 }

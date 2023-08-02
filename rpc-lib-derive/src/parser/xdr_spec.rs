@@ -86,17 +86,17 @@ impl Specification {
 
     pub fn get_type_specification<'a>(&'a self, name: &str) -> Option<ResolvedType<'a>> {
         for s in &self.structs {
-            if &s.name == name {
+            if s.name == name {
                 return Some(ResolvedType::Struct(s));
             }
         }
         for u in &self.unions {
-            if &u.name == name {
+            if u.name == name {
                 return Some(ResolvedType::Union(u));
             }
         }
         for e in &self.enums {
-            if &e.name == name {
+            if e.name == name {
                 return Some(ResolvedType::Enum(e));
             }
         }

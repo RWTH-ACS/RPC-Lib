@@ -73,6 +73,7 @@ impl Version {
     pub fn create_sliced_variants(&mut self, spec: &Specification) {
         let mut sliced_procedures = Vec::new();
         for p in &self.procedures {
+            #[allow(clippy::single_match)]
             match &p.return_type {
                 DataType::TypeDef { name } => match spec.get_type_specification(name) {
                     Some(ResolvedType::Union(u)) => {

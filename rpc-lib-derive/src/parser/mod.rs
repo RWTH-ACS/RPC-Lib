@@ -57,7 +57,7 @@ pub fn parse(x_file: &str, struct_name: &str) -> (TokenStream, u32, u32) {
         program
             .versions
             .iter_mut()
-            .for_each(|v| v.create_sliced_variants(&spec));
+            .for_each(|v| v.create_sliced_variants(spec));
     }
     let program_number = program.program_number;
     let version_number = program.versions[0].version_number;

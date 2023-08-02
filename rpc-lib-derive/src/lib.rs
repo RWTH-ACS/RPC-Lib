@@ -33,7 +33,7 @@ pub fn include_rpcl(meta: TokenStream, item: TokenStream) -> TokenStream {
     let path = Path::new(&name_x_file[1..len - 1]);
 
     //Read .x-File
-    let mut file = File::open(&path).expect("Couldn't open .x-File");
+    let mut file = File::open(path).expect("Couldn't open .x-File");
     let mut s = String::new();
     file.read_to_string(&mut s)
         .unwrap_or_else(|_| panic!("Couldn't read {}", path.display()));
