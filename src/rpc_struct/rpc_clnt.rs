@@ -155,6 +155,7 @@ pub fn clnt_create(ip: IpAddr, program: u32, version: u32) -> io::Result<RpcClie
 
     // Create TcpStream
     let tcp_stream = TcpStream::connect(addr.0)?;
+    tcp_stream.set_nodelay(true).expect("setting no_delay failed");
 
     Ok(RpcClient {
         program,
